@@ -2,7 +2,7 @@
 
 MarketSentry Pro: monitor prediction markets, stocks and exchange rates in Home Assistant and automate on price changes.
 
-> **Currently shipped: Polymarket prediction markets only.** Stocks (Finnhub/Alpaca) and exchange rates (Frankfurter/Bank of Israel) are planned but not yet implemented. This section describes what's available today.
+> **Currently shipped (usable in HA today): Polymarket prediction markets only.** Stocks (Finnhub/Alpaca) and exchange rates (Frankfurter/Bank of Israel) have a working, unit-tested provider implementation in `custom_components/marketsentry/providers/` (`finnhub.py`, `alpaca.py`, `fx.py`), but the config flow, coordinator and entities haven't been generalized to expose them in the UI yet — that wiring is the next step. This section describes what's usable today. See "Multi-provider build status" below for what else to verify before any of the three new providers go live.
 
 A read-only Home Assistant integration that tracks [Polymarket](https://polymarket.com) prediction markets and lets your automations react to price moves, large trades, volume spikes, closing deadlines, and resolutions.
 
@@ -120,3 +120,38 @@ ruff check custom_components/marketsentry
 mypy custom_components/marketsentry
 pytest tests
 ```
+
+## Multi-provider build status
+
+Landed: `providers/base.py` (the `Provider` interface + `InstrumentRef`/`Quote`/
+`Trade`/`PricePoint`/`ProviderEvent`), `providers/polymarket.py` (wraps the
+existing Gamma/CLOB client behind that interface, no behavior change),
+`providers/finnhub.py`, `providers/alpaca.py`, `providers/fx.py`, a
+generalized `detector.py` (percent vs. percentage-point `price_move`,
+`DailyChangeDetector`, `MarketOpenGapDetector`, `OfficialRatePublishedDetector`),
+and `market_calendar.py` (NYSE/NASDAQ session state with a bundled 2025-2027
+holiday table). All unit-tested (98 tests).
+
+Not yet landed: config flow provider/credential/instrument steps (incl.
+whether HA config subentries fit the "one entry per provider account, many
+instruments" shape - early research pointed at them being viable
+but this wasn't implemented or verified end-to-end), the generic
+coordinator/entity/sensor rewrite that would actually expose Finnhub/Alpaca/FX
+instruments in HA, and the `marketsentry-card` frontend.
+
+**API facts not independently verified this session** (a research-fetch tool
+failed; the implementations follow each provider's long-documented, stable
+public contract from training knowledge - flagged in each provider module's
+docstring). Verify against live docs/calls before relying on these in
+production:
+- Finnhub: WS subscribe/trade message shapes, REST `/quote` and `/search`
+  field names, free-tier WS symbol limit (~30).
+- Alpaca: the exact stream feed path/value (`iex` vs `sip`), trade message
+  field names (quote message shape WAS confirmed live), REST market-data
+  endpoint paths, free-tier WS symbol limit.
+- Frankfurter: base URL (`api.frankfurter.dev/v1` vs the older `.app`
+  domain), `base`/`symbols` vs `from`/`to` parameter names.
+- Bank of Israel: the SDMX series-key format (assumed `RER_<CCY>_ILS`) and
+  the `c[DATA_TYPE]=OF00` filter syntax - taken from BOI's own published
+  guide, not a live test call. `fetch_history` for this source isn't
+  implemented yet pending that verification.

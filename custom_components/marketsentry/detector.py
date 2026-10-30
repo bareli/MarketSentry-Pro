@@ -1,13 +1,21 @@
-"""Pure-Python change detection for Polymarket markets.
+"""Pure-Python change detection, generic across providers (Polymarket
+outcomes, stocks, FX pairs).
 
 No HA imports. Every function/class here is unit-testable in isolation.
+`ClosingSoonDetector` and `ResolvedDetector` are Polymarket-specific
+(callers simply don't use them for other kinds); everything else operates
+on plain numeric values and is kind-agnostic.
+
+The three event types below aren't wired into any HA entity yet (that
+lands with the generic coordinator/entity rewrite); they're kept here,
+not in const.EVENT_TYPES, so they don't appear as triggers HA can't fire.
 """
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from .const import (
     EVENT_CLOSING_SOON,
@@ -17,6 +25,10 @@ from .const import (
     EVENT_THRESHOLD_CROSSED,
     EVENT_VOLUME_SPIKE,
 )
+
+EVENT_DAILY_CHANGE = "daily_change"
+EVENT_MARKET_OPEN_GAP = "market_open_gap"
+EVENT_OFFICIAL_RATE_PUBLISHED = "official_rate_published"
 
 
 @dataclass(slots=True)
@@ -98,10 +110,18 @@ class ThresholdDetector:
 
 
 class PriceMoveDetector:
-    """Fires `price_move` when |change| >= delta_pp within a rolling window."""
+    """Fires `price_move` when |change| >= threshold within a rolling window.
 
-    def __init__(self, delta_pp: float, window_min: int) -> None:
+    `relative=False` (default, Polymarket outcomes): threshold is in
+    percentage points of the 0-100 value, matching the original behavior.
+    `relative=True` (stocks/FX): threshold is a percent change relative to
+    the window's starting price; the percent change is reported in
+    `extra["change_pct"]` alongside the raw `delta_pp`.
+    """
+
+    def __init__(self, delta_pp: float, window_min: int, relative: bool = False) -> None:
         self._delta_pp = delta_pp
+        self._relative = relative
         self._window = timedelta(minutes=window_min)
         self._window_min = window_min
         self._history: deque[tuple[datetime, float]] = deque()
@@ -115,9 +135,12 @@ class PriceMoveDetector:
         if not self._history:
             return []
 
-        oldest_time, oldest_price = self._history[0]
+        _oldest_time, oldest_price = self._history[0]
         delta = price - oldest_price
-        if abs(delta) >= self._delta_pp:
+        change_pct = (delta / oldest_price * 100) if oldest_price else 0.0
+        magnitude = abs(change_pct) if self._relative else abs(delta)
+
+        if magnitude >= self._delta_pp:
             # Reset window so we don't immediately re-fire on the same move.
             self._history.clear()
             self._history.append((now, price))
@@ -131,6 +154,7 @@ class PriceMoveDetector:
                     delta_pp=delta,
                     direction="up" if delta > 0 else "down",
                     window_min=self._window_min,
+                    extra={"change_pct": change_pct},
                 )
             ]
         return []
@@ -182,6 +206,124 @@ class VolumeSpikeDetector:
                 )
         self._last_volume = volume_24hr
         return events
+
+
+class DailyChangeDetector:
+    """Fires `daily_change` when |change| vs a reference value >= pct.
+
+    The reference is the previous close/official rate when the caller
+    supplies one (e.g. Finnhub's `pc` field); otherwise it falls back to
+    the first value seen each UTC calendar day. Fires at most once per day.
+    """
+
+    def __init__(self, change_pct: float) -> None:
+        self._change_pct = change_pct
+        self._reference: float | None = None
+        self._reference_day: date | None = None
+        self._fired_today = False
+
+    def update(
+        self,
+        outcome: str,
+        token_id: str,
+        price: float,
+        now: datetime,
+        previous_close: float | None = None,
+    ) -> list[DetectedEvent]:
+        today = now.date()
+        if self._reference_day != today:
+            self._reference_day = today
+            self._reference = previous_close if previous_close is not None else price
+            self._fired_today = False
+        elif previous_close is not None:
+            self._reference = previous_close
+
+        if self._fired_today or not self._reference:
+            return []
+
+        change_pct = (price - self._reference) / self._reference * 100
+        if abs(change_pct) >= self._change_pct:
+            self._fired_today = True
+            return [
+                DetectedEvent(
+                    event_type=EVENT_DAILY_CHANGE,
+                    outcome=outcome,
+                    token_id=token_id,
+                    old=self._reference,
+                    new=price,
+                    extra={"change_pct": change_pct},
+                )
+            ]
+        return []
+
+
+class MarketOpenGapDetector:
+    """Fires `market_open_gap` once per session: first regular-hours price
+    vs the previous close, when the gap is >= gap_pct (stocks only)."""
+
+    def __init__(self, gap_pct: float) -> None:
+        self._gap_pct = gap_pct
+        self._last_session_day: date | None = None
+        self._fired_this_session = False
+
+    def check(
+        self,
+        outcome: str,
+        token_id: str,
+        price: float,
+        previous_close: float | None,
+        market_state: str,
+        now: datetime,
+    ) -> list[DetectedEvent]:
+        today = now.date()
+        if self._last_session_day != today:
+            self._last_session_day = today
+            self._fired_this_session = False
+
+        if market_state != "regular" or self._fired_this_session or not previous_close:
+            return []
+
+        self._fired_this_session = True
+        gap_pct = (price - previous_close) / previous_close * 100
+        if abs(gap_pct) >= self._gap_pct:
+            return [
+                DetectedEvent(
+                    event_type=EVENT_MARKET_OPEN_GAP,
+                    outcome=outcome,
+                    token_id=token_id,
+                    old=previous_close,
+                    new=price,
+                    extra={"change_pct": gap_pct},
+                )
+            ]
+        return []
+
+
+class OfficialRatePublishedDetector:
+    """FX-only: fires `official_rate_published` once per new BOI publication date."""
+
+    def __init__(self) -> None:
+        self._last_published_date: date | None = None
+
+    def check(
+        self, outcome: str, token_id: str, rate: float, published_date: date
+    ) -> list[DetectedEvent]:
+        if self._last_published_date == published_date:
+            return []
+        is_first_observation = self._last_published_date is None
+        self._last_published_date = published_date
+        if is_first_observation:
+            return []
+        return [
+            DetectedEvent(
+                event_type=EVENT_OFFICIAL_RATE_PUBLISHED,
+                outcome=outcome,
+                token_id=token_id,
+                old=None,
+                new=rate,
+                extra={"published_date": published_date.isoformat()},
+            )
+        ]
 
 
 class ClosingSoonDetector:
