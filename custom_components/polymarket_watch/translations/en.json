@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Track a Polymarket market",
+        "description": "Paste a Polymarket URL (polymarket.com/event/... or /market/...) or a bare slug.",
+        "data": {
+          "url_or_slug": "URL or slug"
+        }
+      },
+      "confirm_market": {
+        "title": "Confirm market",
+        "description": "Track this market?\n\n**{question}**"
+      },
+      "select_markets": {
+        "title": "Select sub-markets to track",
+        "description": "This event has multiple markets. Pick which ones to track; each becomes its own device.",
+        "data": {
+          "markets": "Markets"
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "Could not parse a Polymarket event/market slug from that input.",
+      "not_found": "That event or market could not be found on Polymarket.",
+      "cannot_connect": "Could not reach the Polymarket API. Try again later.",
+      "no_markets_selected": "Select at least one market to track."
+    },
+    "abort": {
+      "already_configured": "This market is already being tracked."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Polymarket Watch options",
+        "data": {
+          "thresholds": "Probability thresholds (%, comma-separated)",
+          "hysteresis_pp": "Threshold hysteresis (percentage points)",
+          "move_delta_pp": "Price move trigger (percentage points)",
+          "move_window_min": "Price move window (minutes)",
+          "large_trade_usd": "Large trade threshold (USD)",
+          "volume_spike_pct": "24h volume spike threshold (%)",
+          "closing_soon_hours": "Closing soon threshold (hours)",
+          "cooldown_min": "Cooldown per event type (minutes)"
+        }
+      }
+    }
+  },
+  "issues": {
+    "market_not_found": {
+      "title": "Polymarket market not found",
+      "description": "The tracked market '{slug}' could not be found on Polymarket. It may have been removed or archived. Remove and re-add this integration with a valid market."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "probability": { "name": "{outcome} probability" },
+      "last_trade_price": { "name": "{outcome} last trade price" },
+      "spread": { "name": "{outcome} spread" },
+      "volume_24hr": { "name": "24h volume" },
+      "total_volume": { "name": "Total volume" },
+      "liquidity": { "name": "Liquidity" },
+      "end_date": { "name": "End date" },
+      "resolution_status": {
+        "name": "Resolution status",
+        "state": {
+          "open": "Open",
+          "proposed": "Proposed",
+          "disputed": "Disputed",
+          "resolved": "Resolved",
+          "closed": "Closed"
+        }
+      },
+      "winning_outcome": { "name": "Winning outcome" }
+    },
+    "binary_sensor": {
+      "closed": { "name": "Closed" },
+      "accepting_orders": { "name": "Accepting orders" },
+      "ws_connected": { "name": "WebSocket connected" }
+    },
+    "event": {
+      "detections": { "name": "Detections" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "threshold_crossed": "Probability crossed a threshold",
+      "price_move": "Fast price move",
+      "large_trade": "Large trade occurred",
+      "volume_spike": "24h volume spike",
+      "resolved": "Market resolved",
+      "closing_soon": "Closing soon"
+    }
+  },
+  "services": {
+    "get_price_history": {
+      "name": "Get price history",
+      "description": "Fetch historical price points for one outcome.",
+      "fields": {
+        "device_id": { "name": "Device", "description": "The tracked market device." },
+        "outcome": { "name": "Outcome", "description": "Outcome name, e.g. Yes." },
+        "interval": { "name": "Interval", "description": "History interval." },
+        "fidelity": { "name": "Fidelity", "description": "Resolution in minutes." }
+      }
+    },
+    "refresh": {
+      "name": "Refresh",
+      "description": "Force a metadata refresh for a tracked market.",
+      "fields": {
+        "device_id": { "name": "Device", "description": "The tracked market device." }
+      }
+    },
+    "search_markets": {
+      "name": "Search markets",
+      "description": "Search Polymarket for markets matching a query.",
+      "fields": {
+        "query": { "name": "Query", "description": "Search text." },
+        "limit": { "name": "Limit", "description": "Maximum results." }
+      }
+    }
+  }
+}

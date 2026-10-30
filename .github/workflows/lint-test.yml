@@ -1,0 +1,38 @@
+name: Lint and test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: pip install -r requirements_test.txt
+
+      - name: Ruff
+        run: ruff check custom_components/polymarket_watch
+
+      - name: Mypy
+        run: mypy custom_components/polymarket_watch
+
+      - name: Pytest with coverage
+        run: |
+          pip install pytest-cov
+          pytest tests \
+            --cov=custom_components.polymarket_watch.detector \
+            --cov=custom_components.polymarket_watch.api \
+            --cov=custom_components.polymarket_watch.ws \
+            --cov-report=term-missing \
+            --cov-fail-under=90 \
+            -q

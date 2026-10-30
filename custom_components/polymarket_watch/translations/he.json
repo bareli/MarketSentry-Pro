@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "מעקב אחר שוק בפולימרקט",
+        "description": "הדביקו כתובת URL של פולימרקט (polymarket.com/event/... או /market/...) או slug בלבד.",
+        "data": {
+          "url_or_slug": "כתובת URL או slug"
+        }
+      },
+      "confirm_market": {
+        "title": "אישור שוק",
+        "description": "לעקוב אחרי השוק הזה?\n\n**{question}**"
+      },
+      "select_markets": {
+        "title": "בחירת תת-שווקים למעקב",
+        "description": "לאירוע הזה יש כמה שווקים. בחרו אילו לעקוב אחריהם; כל אחד יהפוך למכשיר נפרד.",
+        "data": {
+          "markets": "שווקים"
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "לא הצלחנו לחלץ slug של אירוע/שוק מהקלט הזה.",
+      "not_found": "האירוע או השוק לא נמצאו בפולימרקט.",
+      "cannot_connect": "לא ניתן להתחבר ל-API של פולימרקט. נסו שוב מאוחר יותר.",
+      "no_markets_selected": "בחרו לפחות שוק אחד למעקב."
+    },
+    "abort": {
+      "already_configured": "השוק הזה כבר במעקב."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "הגדרות Polymarket Watch",
+        "data": {
+          "thresholds": "ספי הסתברות (%, מופרדים בפסיקים)",
+          "hysteresis_pp": "היסטרזיס סף (נקודות אחוז)",
+          "move_delta_pp": "סף שינוי מחיר (נקודות אחוז)",
+          "move_window_min": "חלון זמן לשינוי מחיר (דקות)",
+          "large_trade_usd": "סף עסקה גדולה (דולר)",
+          "volume_spike_pct": "סף קפיצת מחזור 24 שעות (%)",
+          "closing_soon_hours": "סף \"נסגר בקרוב\" (שעות)",
+          "cooldown_min": "תקופת צינון לכל סוג התראה (דקות)"
+        }
+      }
+    }
+  },
+  "issues": {
+    "market_not_found": {
+      "title": "שוק פולימרקט לא נמצא",
+      "description": "השוק '{slug}' שבמעקב לא נמצא בפולימרקט. ייתכן שהוסר או הועבר לארכיון. הסירו והוסיפו מחדש את האינטגרציה עם שוק תקין."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "probability": { "name": "הסתברות {outcome}" },
+      "last_trade_price": { "name": "מחיר עסקה אחרון {outcome}" },
+      "spread": { "name": "מרווח {outcome}" },
+      "volume_24hr": { "name": "מחזור 24 שעות" },
+      "total_volume": { "name": "מחזור כולל" },
+      "liquidity": { "name": "נזילות" },
+      "end_date": { "name": "תאריך סיום" },
+      "resolution_status": {
+        "name": "סטטוס הכרעה",
+        "state": {
+          "open": "פתוח",
+          "proposed": "הוצע",
+          "disputed": "במחלוקת",
+          "resolved": "הוכרע",
+          "closed": "סגור"
+        }
+      },
+      "winning_outcome": { "name": "תוצאה מנצחת" }
+    },
+    "binary_sensor": {
+      "closed": { "name": "סגור" },
+      "accepting_orders": { "name": "מקבל הזמנות" },
+      "ws_connected": { "name": "WebSocket מחובר" }
+    },
+    "event": {
+      "detections": { "name": "התראות" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "threshold_crossed": "הסתברות חצתה סף",
+      "price_move": "שינוי מחיר מהיר",
+      "large_trade": "התרחשה עסקה גדולה",
+      "volume_spike": "קפיצת מחזור 24 שעות",
+      "resolved": "השוק הוכרע",
+      "closing_soon": "נסגר בקרוב"
+    }
+  },
+  "services": {
+    "get_price_history": {
+      "name": "קבלת היסטוריית מחירים",
+      "description": "שליפת נתוני מחיר היסטוריים לתוצאה אחת.",
+      "fields": {
+        "device_id": { "name": "מכשיר", "description": "מכשיר השוק שבמעקב." },
+        "outcome": { "name": "תוצאה", "description": "שם התוצאה, לדוגמה Yes." },
+        "interval": { "name": "מרווח", "description": "מרווח ההיסטוריה." },
+        "fidelity": { "name": "דיוק", "description": "רזולוציה בדקות." }
+      }
+    },
+    "refresh": {
+      "name": "רענון",
+      "description": "רענון מטא-דאטה כפוי לשוק שבמעקב.",
+      "fields": {
+        "device_id": { "name": "מכשיר", "description": "מכשיר השוק שבמעקב." }
+      }
+    },
+    "search_markets": {
+      "name": "חיפוש שווקים",
+      "description": "חיפוש שווקים בפולימרקט לפי שאילתה.",
+      "fields": {
+        "query": { "name": "שאילתה", "description": "טקסט חיפוש." },
+        "limit": { "name": "מגבלה", "description": "מספר תוצאות מקסימלי." }
+      }
+    }
+  }
+}

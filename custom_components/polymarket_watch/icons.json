@@ -1,0 +1,23 @@
+{
+  "entity": {
+    "sensor": {
+      "probability": { "default": "mdi:chart-line" },
+      "last_trade_price": { "default": "mdi:swap-horizontal" },
+      "spread": { "default": "mdi:arrow-expand-horizontal" },
+      "volume_24hr": { "default": "mdi:cash-fast" },
+      "total_volume": { "default": "mdi:cash-multiple" },
+      "liquidity": { "default": "mdi:water" },
+      "end_date": { "default": "mdi:calendar-clock" },
+      "resolution_status": { "default": "mdi:gavel" },
+      "winning_outcome": { "default": "mdi:trophy" }
+    },
+    "binary_sensor": {
+      "closed": { "default": "mdi:lock", "state": { "off": "mdi:lock-open-variant" } },
+      "accepting_orders": { "default": "mdi:check-circle", "state": { "off": "mdi:close-circle" } },
+      "ws_connected": { "default": "mdi:wifi", "state": { "off": "mdi:wifi-off" } }
+    },
+    "event": {
+      "detections": { "default": "mdi:bell-alert" }
+    }
+  }
+}

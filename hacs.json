@@ -1,0 +1,7 @@
+{
+  "name": "Polymarket Watch",
+  "render_readme": true,
+  "content_in_root": false,
+  "homeassistant": "2026.10.0",
+  "iot_class": "cloud_push"
+}
