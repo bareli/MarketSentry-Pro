@@ -21,18 +21,18 @@ jobs:
         run: pip install -r requirements_test.txt
 
       - name: Ruff
-        run: ruff check custom_components/polymarket_watch
+        run: ruff check custom_components/marketsentry
 
       - name: Mypy
-        run: mypy custom_components/polymarket_watch
+        run: mypy custom_components/marketsentry
 
       - name: Pytest with coverage
         run: |
           pip install pytest-cov
           pytest tests \
-            --cov=custom_components.polymarket_watch.detector \
-            --cov=custom_components.polymarket_watch.api \
-            --cov=custom_components.polymarket_watch.ws \
+            --cov=custom_components.marketsentry.detector \
+            --cov=custom_components.marketsentry.api \
+            --cov=custom_components.marketsentry.ws \
             --cov-report=term-missing \
             --cov-fail-under=90 \
             -q

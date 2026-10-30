@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from custom_components.polymarket_watch.models import Market, Outcome, parse_json_field
+from custom_components.marketsentry.models import Market, Outcome, parse_json_field
 
 
 def test_parse_json_field_handles_json_string() -> None:

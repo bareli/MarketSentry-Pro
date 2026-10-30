@@ -30,7 +30,7 @@ class PolymarketMetadataCoordinator(DataUpdateCoordinator[MarketData]):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"polymarket_watch_metadata_{market_slug}",
+            name=f"marketsentry_metadata_{market_slug}",
             update_interval=timedelta(seconds=METADATA_UPDATE_INTERVAL_SEC),
         )
         self._api = api

@@ -1,4 +1,4 @@
-"""Shared, plain-data fixtures for Polymarket Watch tests.
+"""Shared, plain-data fixtures for MarketSentry Pro tests.
 
 No Home Assistant test-harness plugin here on purpose: test_models.py,
 test_detector.py, test_api.py, and test_ws.py exercise pure-Python /

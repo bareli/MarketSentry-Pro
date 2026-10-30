@@ -1,10 +1,10 @@
-"""Constants for the Polymarket Watch integration."""
+"""Constants for the MarketSentry Pro integration."""
 
 from __future__ import annotations
 
 from typing import Final
 
-DOMAIN: Final = "polymarket_watch"
+DOMAIN: Final = "marketsentry"
 
 # --- API endpoints ---
 GAMMA_BASE_URL: Final = "https://gamma-api.polymarket.com"
@@ -69,7 +69,7 @@ EVENT_TYPES: Final = [
     EVENT_CLOSING_SOON,
 ]
 
-BUS_EVENT_PREFIX: Final = "polymarket_watch_"
+BUS_EVENT_PREFIX: Final = "marketsentry_"
 
 # --- Resolution status enum ---
 STATUS_OPEN: Final = "open"

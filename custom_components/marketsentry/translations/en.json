@@ -33,7 +33,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "Polymarket Watch options",
+        "title": "MarketSentry Pro options",
         "data": {
           "thresholds": "Probability thresholds (%, comma-separated)",
           "hysteresis_pp": "Threshold hysteresis (percentage points)",

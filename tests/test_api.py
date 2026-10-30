@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from aiohttp import web
 
-from custom_components.polymarket_watch.api import (
+from custom_components.marketsentry.api import (
     PolymarketApiClient,
     PolymarketApiError,
     PolymarketNotFoundError,
@@ -46,7 +46,7 @@ async def test_get_midpoint_parses_string_price(aiohttp_client) -> None:
     client = await aiohttp_client(app)
 
     api = PolymarketApiClient(client.session)
-    import custom_components.polymarket_watch.api as api_module
+    import custom_components.marketsentry.api as api_module
 
     api_module.CLOB_BASE_URL = str(client.make_url("")).rstrip("/")
     mid = await api.get_midpoint("abc")

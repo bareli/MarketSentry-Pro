@@ -1,4 +1,4 @@
-"""The Polymarket Watch integration."""
+"""The MarketSentry Pro integration."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class MarketTracker:
 
 
 @dataclass(slots=True)
-class PolymarketWatchRuntimeData:
+class MarketSentryRuntimeData:
     """Stored on entry.runtime_data."""
 
     api: PolymarketApiClient
@@ -101,7 +101,7 @@ class PolymarketWatchRuntimeData:
 
 
 @dataclass(slots=True)
-class PolymarketWatchGlobalData:
+class MarketSentryGlobalData:
     """Shared singleton state across all config entries, in hass.data."""
 
     ws_manager: PolymarketWsManager
@@ -110,7 +110,7 @@ class PolymarketWatchGlobalData:
     ws_down_since: float | None = None
 
 
-type PolymarketWatchConfigEntry = ConfigEntry[PolymarketWatchRuntimeData]
+type MarketSentryConfigEntry = ConfigEntry[MarketSentryRuntimeData]
 
 
 def _build_options(entry: ConfigEntry) -> dict[str, Any]:
@@ -127,8 +127,8 @@ def _build_options(entry: ConfigEntry) -> dict[str, Any]:
     }
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: PolymarketWatchConfigEntry) -> bool:
-    """Set up a Polymarket Watch config entry (one tracked market)."""
+async def async_setup_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:
+    """Set up a MarketSentry Pro config entry (one tracked market)."""
     session = async_get_clientsession(hass)
     api = PolymarketApiClient(session)
 
@@ -179,7 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PolymarketWatchConfigEnt
         cooldown=CooldownGate(opts[OPT_COOLDOWN_MIN]),
     )
 
-    entry.runtime_data = PolymarketWatchRuntimeData(api=api, tracker=tracker)
+    entry.runtime_data = MarketSentryRuntimeData(api=api, tracker=tracker)
 
     global_data = await _async_get_or_create_global_data(hass)
     for token_id in outcomes:
@@ -201,12 +201,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: PolymarketWatchConfigEnt
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: PolymarketWatchConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:
     """Unload a config entry and unsubscribe its tokens from the shared WS."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if DOMAIN in hass.data:
-        global_data: PolymarketWatchGlobalData = hass.data[DOMAIN]
+        global_data: MarketSentryGlobalData = hass.data[DOMAIN]
         tracker = entry.runtime_data.tracker
         tokens_to_unsubscribe: list[str] = []
         for token_id in tracker.outcomes:
@@ -229,9 +229,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: PolymarketWatchConfigEn
     return unload_ok
 
 
-async def _async_get_or_create_global_data(hass: HomeAssistant) -> PolymarketWatchGlobalData:
+async def _async_get_or_create_global_data(hass: HomeAssistant) -> MarketSentryGlobalData:
     if DOMAIN in hass.data:
-        return cast(PolymarketWatchGlobalData, hass.data[DOMAIN])
+        return cast(MarketSentryGlobalData, hass.data[DOMAIN])
 
     session = async_get_clientsession(hass)
 
@@ -252,7 +252,7 @@ async def _async_get_or_create_global_data(hass: HomeAssistant) -> PolymarketWat
     ws_manager = PolymarketWsManager(session, on_message, on_connection_state_change)
     await ws_manager.start()
 
-    global_data = PolymarketWatchGlobalData(ws_manager=ws_manager)
+    global_data = MarketSentryGlobalData(ws_manager=ws_manager)
     hass.data[DOMAIN] = global_data
 
     await async_setup_services(hass)
@@ -267,7 +267,7 @@ async def _async_fallback_poll_loop(hass: HomeAssistant) -> None:
     try:
         while True:
             await asyncio.sleep(REST_FALLBACK_POLL_INTERVAL_SEC)
-            global_data: PolymarketWatchGlobalData | None = hass.data.get(DOMAIN)
+            global_data: MarketSentryGlobalData | None = hass.data.get(DOMAIN)
             if global_data is None:
                 continue
             if (
@@ -338,8 +338,8 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
-def _find_entries_for_token(hass: HomeAssistant, token_id: str) -> list[PolymarketWatchConfigEntry]:
-    global_data: PolymarketWatchGlobalData | None = hass.data.get(DOMAIN)
+def _find_entries_for_token(hass: HomeAssistant, token_id: str) -> list[MarketSentryConfigEntry]:
+    global_data: MarketSentryGlobalData | None = hass.data.get(DOMAIN)
     if global_data is None:
         return []
     entry_ids = global_data.token_to_entries.get(token_id, set())
@@ -415,7 +415,7 @@ async def _async_apply_resolution(hass: HomeAssistant, token_id: str, winning_as
             _async_fire_detected_event(hass, entry, event)
 
 
-async def _async_check_metadata_events(hass: HomeAssistant, entry: PolymarketWatchConfigEntry) -> None:
+async def _async_check_metadata_events(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> None:
     """Check volume-spike / closing-soon / resolved against the latest Gamma metadata."""
     tracker = entry.runtime_data.tracker
     data = tracker.coordinator.data
@@ -436,7 +436,7 @@ async def _async_check_metadata_events(hass: HomeAssistant, entry: PolymarketWat
             _async_fire_detected_event(hass, entry, event)
 
 
-def _async_fire_detected_event(hass: HomeAssistant, entry: PolymarketWatchConfigEntry, event: DetectedEvent) -> None:
+def _async_fire_detected_event(hass: HomeAssistant, entry: MarketSentryConfigEntry, event: DetectedEvent) -> None:
     tracker = entry.runtime_data.tracker
     payload = {
         "entry_id": entry.entry_id,
@@ -452,5 +452,5 @@ def _async_fire_detected_event(hass: HomeAssistant, entry: PolymarketWatchConfig
         "url": f"https://polymarket.com/market/{tracker.market_slug}",
         **event.extra,
     }
-    hass.bus.async_fire(f"polymarket_watch_{event.event_type}", payload)
+    hass.bus.async_fire(f"marketsentry_{event.event_type}", payload)
     async_dispatcher_send(hass, f"{SIGNAL_DETECTED_EVENT}_{entry.entry_id}", event, payload)

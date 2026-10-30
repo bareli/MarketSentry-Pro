@@ -1,4 +1,4 @@
-"""Config flow for Polymarket Watch: UI-only, config + options + reconfigure."""
+"""Config flow for MarketSentry Pro: UI-only, config + options + reconfigure."""
 
 from __future__ import annotations
 
@@ -53,10 +53,11 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_SCHEMA = vol.Schema({vol.Required(CONF_URL_OR_SLUG): str})
 
 
-class PolymarketWatchConfigFlow(ConfigFlow, domain=DOMAIN):
+class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the config flow: parse URL/slug -> confirm -> (pick sub-markets)."""
 
     VERSION = 1
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         self._event_data: dict[str, Any] | None = None
@@ -177,10 +178,10 @@ class PolymarketWatchConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return PolymarketWatchOptionsFlow()
+        return MarketSentryOptionsFlow()
 
 
-class PolymarketWatchOptionsFlow(OptionsFlow):
+class MarketSentryOptionsFlow(OptionsFlow):
     """Options flow: change detection thresholds for an existing entry."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

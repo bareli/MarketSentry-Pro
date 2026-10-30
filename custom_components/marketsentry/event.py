@@ -1,4 +1,4 @@
-"""HA `event` platform entities for Polymarket Watch detections."""
+"""HA `event` platform entities for MarketSentry Pro detections."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import SIGNAL_DETECTED_EVENT, PolymarketWatchConfigEntry
+from . import SIGNAL_DETECTED_EVENT, MarketSentryConfigEntry
 from .const import EVENT_TYPES
 from .detector import DetectedEvent
 from .entity import market_device_info
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: PolymarketWatchConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     tracker = entry.runtime_data.tracker
     async_add_entities([PolymarketDetectionEvent(entry, tracker.market_slug)])
@@ -29,7 +29,7 @@ class PolymarketDetectionEvent(EventEntity):
     _attr_translation_key = "detections"
     _attr_event_types = EVENT_TYPES
 
-    def __init__(self, entry: PolymarketWatchConfigEntry, market_slug: str) -> None:
+    def __init__(self, entry: MarketSentryConfigEntry, market_slug: str) -> None:
         self._entry = entry
         self._market_slug = market_slug
         self._attr_unique_id = f"{market_slug}_detections"

@@ -1,4 +1,4 @@
-"""Binary sensor platform for Polymarket Watch."""
+"""Binary sensor platform for MarketSentry Pro."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import SIGNAL_WS_STATE, PolymarketWatchConfigEntry, PolymarketWatchGlobalData
+from . import SIGNAL_WS_STATE, MarketSentryConfigEntry, MarketSentryGlobalData
 from .const import DOMAIN
 from .coordinator import PolymarketMetadataCoordinator
 from .entity import PolymarketEntity
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: PolymarketWatchConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     tracker = entry.runtime_data.tracker
     coordinator = tracker.coordinator
@@ -77,7 +77,7 @@ class WebSocketConnectedBinarySensor(PolymarketEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        global_data: PolymarketWatchGlobalData | None = self._hass.data.get(DOMAIN)
+        global_data: MarketSentryGlobalData | None = self._hass.data.get(DOMAIN)
         if global_data is None:
             return None
         return global_data.ws_manager.connected

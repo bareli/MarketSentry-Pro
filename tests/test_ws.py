@@ -8,7 +8,7 @@ import json
 import pytest
 from aiohttp import web
 
-from custom_components.polymarket_watch.ws import PolymarketWsManager
+from custom_components.marketsentry.ws import PolymarketWsManager
 
 
 async def _fake_ws_app(received: list[dict], pings: list[str]):

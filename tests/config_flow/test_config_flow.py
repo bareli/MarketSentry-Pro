@@ -7,8 +7,8 @@ from unittest.mock import patch
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.core import HomeAssistant
 
-from custom_components.polymarket_watch.const import DOMAIN
-from custom_components.polymarket_watch.models import Market
+from custom_components.marketsentry.const import DOMAIN
+from custom_components.marketsentry.models import Market
 
 from ..conftest import (
     GAMMA_EVENT_MULTI_MARKET_FIXTURE,
@@ -24,7 +24,7 @@ async def test_user_flow_with_market_url(hass: HomeAssistant) -> None:
     assert result["type"] == data_entry_flow.FlowResultType.FORM
 
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_market_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_market_by_slug",
         return_value=Market.from_gamma(GAMMA_MARKET_FIXTURE),
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -52,13 +52,13 @@ async def test_user_flow_invalid_input(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_slug_not_found(hass: HomeAssistant) -> None:
-    from custom_components.polymarket_watch.api import PolymarketNotFoundError
+    from custom_components.marketsentry.api import PolymarketNotFoundError
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_event_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
         side_effect=PolymarketNotFoundError("nope"),
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -72,7 +72,7 @@ async def test_user_flow_single_market_event_skips_selection(hass: HomeAssistant
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_event_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
         return_value=GAMMA_EVENT_SINGLE_MARKET_FIXTURE,
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -86,7 +86,7 @@ async def test_user_flow_multi_market_event_shows_selection(hass: HomeAssistant)
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_event_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
         return_value=GAMMA_EVENT_MULTI_MARKET_FIXTURE,
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -101,7 +101,7 @@ async def test_multi_market_selection_creates_multiple_entries(hass: HomeAssista
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_event_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
         return_value=GAMMA_EVENT_MULTI_MARKET_FIXTURE,
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -121,7 +121,7 @@ async def test_multi_market_selection_creates_multiple_entries(hass: HomeAssista
 
 async def test_options_flow_parses_comma_separated_thresholds(hass: HomeAssistant) -> None:
     with patch(
-        "custom_components.polymarket_watch.api.PolymarketApiClient.get_market_by_slug",
+        "custom_components.marketsentry.api.PolymarketApiClient.get_market_by_slug",
         return_value=Market.from_gamma(GAMMA_MARKET_FIXTURE),
     ):
         entry_result = await hass.config_entries.flow.async_init(

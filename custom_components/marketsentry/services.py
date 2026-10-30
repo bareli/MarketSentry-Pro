@@ -1,4 +1,4 @@
-"""Services for Polymarket Watch: get_price_history, refresh, search_markets."""
+"""Services for MarketSentry Pro: get_price_history, refresh, search_markets."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from . import PolymarketWatchConfigEntry
+    from . import MarketSentryConfigEntry
 
 GET_PRICE_HISTORY_SCHEMA = vol.Schema(
     {
@@ -47,7 +47,7 @@ SEARCH_MARKETS_SCHEMA = vol.Schema(
 )
 
 
-def _find_entry_for_device(hass: HomeAssistant, device_id: str) -> PolymarketWatchConfigEntry:
+def _find_entry_for_device(hass: HomeAssistant, device_id: str) -> MarketSentryConfigEntry:
     device_registry = dr.async_get(hass)
     device = device_registry.devices.get(device_id)
     if device is None:
@@ -56,7 +56,7 @@ def _find_entry_for_device(hass: HomeAssistant, device_id: str) -> PolymarketWat
         entry = hass.config_entries.async_get_entry(config_entry_id)
         if entry is not None and entry.domain == DOMAIN:
             return entry
-    raise ValueError(f"No Polymarket Watch config entry found for device_id: {device_id}")
+    raise ValueError(f"No MarketSentry Pro config entry found for device_id: {device_id}")
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:

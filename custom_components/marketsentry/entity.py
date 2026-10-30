@@ -1,4 +1,4 @@
-"""Base entity for Polymarket Watch: one HA device per tracked market."""
+"""Base entity for MarketSentry Pro: one HA device per tracked market."""
 
 from __future__ import annotations
 

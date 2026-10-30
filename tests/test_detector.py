@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from custom_components.polymarket_watch.detector import (
+from custom_components.marketsentry.detector import (
     ClosingSoonDetector,
     CooldownGate,
     DetectedEvent,

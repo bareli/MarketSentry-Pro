@@ -1,4 +1,4 @@
-"""Sensor platform for Polymarket Watch."""
+"""Sensor platform for MarketSentry Pro."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import SIGNAL_QUOTE_UPDATE, SIGNAL_TRADE, OutcomeTracker, PolymarketWatchConfigEntry
+from . import SIGNAL_QUOTE_UPDATE, SIGNAL_TRADE, MarketSentryConfigEntry, OutcomeTracker
 from .const import (
     STATUS_CLOSED,
     STATUS_DISPUTED,
@@ -25,7 +25,7 @@ from .models import Quote, Trade
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: PolymarketWatchConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     tracker = entry.runtime_data.tracker
     coordinator = tracker.coordinator

@@ -33,7 +33,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "הגדרות Polymarket Watch",
+        "title": "הגדרות MarketSentry Pro",
         "data": {
           "thresholds": "ספי הסתברות (%, מופרדים בפסיקים)",
           "hysteresis_pp": "היסטרזיס סף (נקודות אחוז)",

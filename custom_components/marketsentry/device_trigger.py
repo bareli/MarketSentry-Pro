@@ -1,4 +1,4 @@
-"""Device triggers for Polymarket Watch: one per detection event type."""
+"""Device triggers for MarketSentry Pro: one per detection event type."""
 
 from __future__ import annotations
 

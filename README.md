@@ -1,8 +1,12 @@
-# Polymarket Watch
+# MarketSentry Pro
+
+MarketSentry Pro: monitor prediction markets, stocks and exchange rates in Home Assistant and automate on price changes.
+
+> **Currently shipped: Polymarket prediction markets only.** Stocks (Finnhub/Alpaca) and exchange rates (Frankfurter/Bank of Israel) are planned but not yet implemented. This section describes what's available today.
 
 A read-only Home Assistant integration that tracks [Polymarket](https://polymarket.com) prediction markets and lets your automations react to price moves, large trades, volume spikes, closing deadlines, and resolutions.
 
-> **Unofficial, not affiliated with Polymarket.** This integration only reads public, no-auth Polymarket endpoints. It cannot trade, place orders, or touch a wallet. Polymarket's terms of service and your local gambling/prediction-market regulations apply to how you use this data.
+> **Unofficial, not affiliated with Polymarket, Finnhub, Alpaca, the Bank of Israel or any other provider.** This integration only reads public, no-auth Polymarket endpoints. It cannot trade, place orders, or touch a wallet. Polymarket's terms of service and your local gambling/prediction-market regulations apply to how you use this data.
 
 ## What it does
 
@@ -23,9 +27,9 @@ A read-only Home Assistant integration that tracks [Polymarket](https://polymark
 
 ## Installation (HACS)
 
-1. HACS > Integrations > search for "Polymarket Watch" (or add this repository as a custom repository).
+1. HACS > Integrations > search for "MarketSentry Pro" (or add this repository as a custom repository).
 2. Install, then restart Home Assistant.
-3. Settings > Devices & services > Add integration > "Polymarket Watch".
+3. Settings > Devices & services > Add integration > "MarketSentry Pro".
 
 ## Setting up a tracked market
 
@@ -43,7 +47,7 @@ automation:
   - alias: "Notify when Yes crosses 60%"
     trigger:
       - platform: event
-        event_type: polymarket_watch_threshold_crossed
+        event_type: marketsentry_threshold_crossed
         event_data:
           outcome: "Yes"
           direction: up
@@ -63,7 +67,7 @@ automation:
   - alias: "Flash light when a tracked market resolves"
     trigger:
       - platform: event
-        event_type: polymarket_watch_resolved
+        event_type: marketsentry_resolved
     action:
       - service: light.turn_on
         target:
@@ -95,13 +99,13 @@ You can also build triggers in the UI: on a tracked market's device, use **Devic
 
 ## Services
 
-- `polymarket_watch.get_price_history` — historical price points for one outcome (device, outcome, interval, fidelity). Returns response data.
-- `polymarket_watch.refresh` — force an immediate metadata refresh for a tracked market.
-- `polymarket_watch.search_markets` — search Polymarket by free text (query, limit). Returns response data; usable from Assist/LLM tooling.
+- `marketsentry.get_price_history` — historical price points for one outcome (device, outcome, interval, fidelity). Returns response data.
+- `marketsentry.refresh` — force an immediate metadata refresh for a tracked market.
+- `marketsentry.search_markets` — search Polymarket by free text (query, limit). Returns response data; usable from Assist/LLM tooling.
 
 ## Diagnostics
 
-Each config entry exposes a diagnostics download (Settings > Devices & services > Polymarket Watch > entry > Download diagnostics) with WebSocket connection state, subscribed token count, last message age, and per-outcome quote state. There is nothing sensitive to redact: every endpoint used is public and unauthenticated.
+Each config entry exposes a diagnostics download (Settings > Devices & services > MarketSentry Pro > entry > Download diagnostics) with WebSocket connection state, subscribed token count, last message age, and per-outcome quote state. There is nothing sensitive to redact: every endpoint used is public and unauthenticated.
 
 ## Limitations
 
@@ -112,7 +116,7 @@ Each config entry exposes a diagnostics download (Settings > Devices & services 
 
 ```bash
 pip install -r requirements_test.txt
-ruff check custom_components/polymarket_watch
-mypy custom_components/polymarket_watch
+ruff check custom_components/marketsentry
+mypy custom_components/marketsentry
 pytest tests
 ```
