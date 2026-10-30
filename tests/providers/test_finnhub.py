@@ -21,7 +21,8 @@ async def _provider_for(aiohttp_client, app: web.Application) -> FinnhubProvider
 async def test_search_maps_results_to_instrument_refs(aiohttp_client) -> None:
     async def handler(request: web.Request) -> web.Response:
         assert request.query["q"] == "apple"
-        assert request.query["token"] == "test-key"
+        assert request.headers["X-Finnhub-Token"] == "test-key"
+        assert "token" not in request.query
         return web.json_response(
             {
                 "count": 1,

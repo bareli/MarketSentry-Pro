@@ -10,12 +10,19 @@ before relying on exact field names/limits in production:
 - WebSocket: wss://ws.finnhub.io?token=<key>; subscribe
   {"type":"subscribe","symbol":"AAPL"}; trade messages
   {"type":"trade","data":[{"p":price,"s":symbol,"t":ms,"v":volume,"c":[...]}]}.
-- REST quote: GET /quote?symbol=&token= -> {"c":current,"d":change,
-  "dp":percent_change,"h":high,"l":low,"o":open,"pc":previous_close,"t":ts}.
-- REST search: GET /search?q=&token= -> {"count":N,"result":[{"symbol",
-  "displaySymbol","description","type"}]}.
+- REST quote: GET /quote?symbol= (token via X-Finnhub-Token header) ->
+  {"c":current,"d":change,"dp":percent_change,"h":high,"l":low,"o":open,
+  "pc":previous_close,"t":ts}.
+- REST search: GET /search?q= (token via X-Finnhub-Token header) ->
+  {"count":N,"result":[{"symbol","displaySymbol","description","type"}]}.
 - Free tier: ~60 REST calls/min; WebSocket symbol-subscription limit
   reported as 30 (unverified, enforce conservatively upstream).
+
+REST calls authenticate via the X-Finnhub-Token header, not a query
+param, so the key never ends up in a logged URL. The WebSocket handshake
+has no header-auth option, so the token must be in its connect URL; WS
+errors are logged/reported by exception type only, never str(err), to
+avoid leaking that URL.
 """
 
 from __future__ import annotations
@@ -28,7 +35,7 @@ import random
 from datetime import UTC, datetime
 from typing import Any
 
-from aiohttp import ClientSession, ClientTimeout, WSMsgType
+from aiohttp import ClientResponseError, ClientSession, ClientTimeout, WSMsgType
 
 from .base import (
     CannotConnect,
@@ -80,18 +87,24 @@ class FinnhubProvider(Provider):
     async def _get(
         self, path: str, params: dict[str, Any] | None = None, api_key: str | None = None
     ) -> Any:
-        query = {**(params or {}), "token": api_key or self._api_key}
+        # Token goes in a header, never the URL/query string, so it can't
+        # leak into logs, exception messages, or request_info on an error.
+        headers = {"X-Finnhub-Token": api_key or self._api_key}
         url = f"{FINNHUB_REST_BASE_URL}{path}"
         try:
-            async with self._session.get(url, params=query, timeout=_REQUEST_TIMEOUT) as resp:
+            async with self._session.get(
+                url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT
+            ) as resp:
                 if resp.status == 401:
                     raise InvalidAuth("Invalid Finnhub API key")
                 resp.raise_for_status()
                 return await resp.json()
         except InvalidAuth:
             raise
+        except ClientResponseError as err:
+            raise CannotConnect(f"Finnhub request to {path} failed: HTTP {err.status}") from err
         except Exception as err:  # noqa: BLE001
-            raise CannotConnect(f"Finnhub request to {path} failed: {err}") from err
+            raise CannotConnect(f"Finnhub request to {path} failed: {type(err).__name__}") from err
 
     async def validate(self, credentials: dict[str, Any]) -> None:
         key = credentials.get("api_key", "")
@@ -208,7 +221,10 @@ class FinnhubProvider(Provider):
             except asyncio.CancelledError:
                 raise
             except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("Finnhub WS error: %s", err)
+                # Never log str(err) here: aiohttp WS errors can embed the
+                # full request URL, which carries the API token as a query
+                # param (the WS handshake has no header-auth option).
+                _LOGGER.debug("Finnhub WS error: %s", type(err).__name__)
 
             attempt += 1
             delay = min(_RECONNECT_MIN_SEC * (2 ** (attempt - 1)), _RECONNECT_MAX_SEC)
