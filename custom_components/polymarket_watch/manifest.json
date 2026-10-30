@@ -1,0 +1,12 @@
+{
+  "domain": "polymarket_watch",
+  "name": "Polymarket Watch",
+  "codeowners": ["@bareli"],
+  "config_flow": true,
+  "documentation": "https://github.com/bareli/polymarket-watch",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/bareli/polymarket-watch/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
