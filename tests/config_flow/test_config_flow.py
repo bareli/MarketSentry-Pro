@@ -224,6 +224,10 @@ async def test_adding_instrument_subentry_reloads_entry_and_creates_entities(
             "custom_components.marketsentry.providers.finnhub.FinnhubProvider.fetch_snapshot",
             return_value={},
         ),
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.stream",
+            return_value=None,
+        ),
     ):
         result = await hass.config_entries.subentries.async_init(
             (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
