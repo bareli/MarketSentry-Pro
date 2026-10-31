@@ -288,7 +288,7 @@ const STYLE = `
     flex: 1 1 auto;
     height: 8px;
     border-radius: 999px;
-    background: var(--secondary-background-color);
+    background: var(--error-color, #f44336);
     overflow: hidden;
   }
   .prob-fill {

@@ -132,7 +132,7 @@ function m(t,e,n){return e==null||Number.isNaN(e)?"\u2014":t==="outcome"?`${e.to
     flex: 1 1 auto;
     height: 8px;
     border-radius: 999px;
-    background: var(--secondary-background-color);
+    background: var(--error-color, #f44336);
     overflow: hidden;
   }
   .prob-fill {
