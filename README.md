@@ -116,6 +116,16 @@ automation:
 
 You can also build these as device triggers in the UI without writing YAML — each instrument's device lists only the trigger types that apply to its kind.
 
+### Ready-made blueprints
+
+No YAML needed — import one of these and fill in the blanks from the UI:
+
+- [**Notify on any event**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fnotify_on_event.yaml) - pick any MarketSentry Pro device trigger and any notification action; the trigger's full event data is available in your action as `{{ trigger.event.data }}`.
+- [**Announce a resolved Polymarket outcome**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fresolved_announce.yaml) - flash a light and/or speak the result when a tracked outcome resolves.
+- [**Daily digest**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fdaily_digest.yaml) - one consolidated notification per day listing every tracked instrument's current value, instead of per-event alerts.
+
+Or browse the raw files in [`blueprints/automation/marketsentry/`](blueprints/automation/marketsentry/) and import manually via Settings > Automations & scenes > Blueprints > Import blueprint.
+
 ## The marketsentry-card dashboard card
 
 Installed and registered automatically — add it to any dashboard like any other card:

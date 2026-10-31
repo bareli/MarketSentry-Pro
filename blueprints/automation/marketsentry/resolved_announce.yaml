@@ -1,0 +1,63 @@
+blueprint:
+  name: MarketSentry Pro - Announce a resolved Polymarket outcome
+  description: >-
+    When a tracked Polymarket outcome resolves, flash a light and/or
+    text-to-speech announce the result. Pick the instrument's "Market
+    resolved" device trigger; this fires exactly once per instrument.
+  domain: automation
+  input:
+    market_trigger:
+      name: Trigger
+      description: >-
+        The instrument's device, with trigger type set to "Market resolved".
+      selector:
+        trigger: {}
+    flash_light:
+      name: Light to flash (optional)
+      default: []
+      selector:
+        target:
+          entity:
+            domain: light
+    tts_target:
+      name: Media player for announcement (optional)
+      default: []
+      selector:
+        target:
+          entity:
+            domain: media_player
+    tts_entity:
+      name: TTS engine (optional)
+      description: Leave empty to skip the spoken announcement.
+      default: ""
+      selector:
+        entity:
+          domain: tts
+
+trigger: !input market_trigger
+
+variables:
+  outcome_name: "{{ trigger.event.data.name }}"
+  winning_outcome: "{{ trigger.event.data.winning_outcome }}"
+
+action:
+  - if:
+      - condition: template
+        value_template: "{{ flash_light is not none and flash_light != [] }}"
+    then:
+      - action: light.turn_on
+        target: !input flash_light
+        data:
+          flash: long
+          color_name: "{{ 'green' if winning_outcome is not none else 'blue' }}"
+  - if:
+      - condition: template
+        value_template: "{{ tts_entity not in [none, ''] and tts_target is not none and tts_target != [] }}"
+    then:
+      - action: tts.speak
+        target:
+          entity_id: !input tts_entity
+        data:
+          media_player_entity_id: "{{ (tts_target.entity_id | default([]) ) }}"
+          message: >-
+            {{ outcome_name }} resolved{{ ' as ' ~ winning_outcome if winning_outcome is not none else '' }}.
