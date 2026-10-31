@@ -1,0 +1,190 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ajouter un compte fournisseur",
+        "description": "Choisissez le fournisseur de données de marché suivi par ce compte. Les identifiants (si nécessaires) sont saisis une seule fois ; les instruments sont ajoutés ensuite sans les ressaisir.",
+        "data": {
+          "provider": "Fournisseur"
+        }
+      },
+      "finnhub_credentials": {
+        "title": "Clé API Finnhub",
+        "description": "L'offre gratuite de Finnhub est réservée à un usage personnel et non commercial. Obtenez une clé gratuite sur finnhub.io.",
+        "data": {
+          "api_key": "Clé API"
+        }
+      },
+      "alpaca_credentials": {
+        "title": "Identifiants API Alpaca",
+        "description": "Offre Basic gratuite : flux IEX uniquement, pas le flux consolidé.",
+        "data": {
+          "key_id": "ID de clé",
+          "secret_key": "Clé secrète",
+          "feed": "Flux"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Identifiants invalides.",
+      "cannot_connect": "Impossible de contacter le fournisseur. Réessayez plus tard."
+    },
+    "abort": {
+      "already_configured": "Ce compte fournisseur est déjà configuré."
+    }
+  },
+  "config_subentries": {
+    "instrument": {
+      "entry_type": "Instrument",
+      "initiate_flow": {
+        "user": "Ajouter un instrument",
+        "reconfigure": "Modifier les options de l'instrument"
+      },
+      "step": {
+        "user": {
+          "title": "Suivre un instrument",
+          "description": "Collez une URL/un slug (Polymarket), un symbole boursier (actions) ou une paire comme EUR/ILS (FX ; ajoutez /boi pour le taux officiel de la Banque d'Israël au lieu du taux de marché). Le texte libre fonctionne aussi comme recherche.",
+          "data": {
+            "url_or_query": "URL, symbole ou paire"
+          }
+        },
+        "select": {
+          "title": "Plusieurs résultats",
+          "description": "Choisissez-en un. Relancez \"Ajouter un instrument\" pour les autres.",
+          "data": {
+            "instrument": "Instrument"
+          }
+        },
+        "confirm": {
+          "title": "Confirmer et définir les seuils",
+          "description": "Suivi de **{name}** ({symbol}).",
+          "data": {
+            "thresholds": "Seuils (séparés par des virgules)",
+            "hysteresis": "Hystérésis",
+            "move_delta": "Déclencheur de mouvement de prix",
+            "move_window_min": "Fenêtre de mouvement de prix (minutes)",
+            "daily_change_pct": "Déclencheur de variation journalière (%)",
+            "large_trade_usd": "Seuil de transaction importante (USD)",
+            "volume_spike_pct": "Seuil de pic de volume sur 24h (%)",
+            "closing_soon_hours": "Seuil \"ferme bientôt\" (heures)",
+            "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
+            "extended_hours": "Suivre les heures étendues",
+            "cooldown_min": "Délai de repos par type d'événement (minutes)"
+          }
+        },
+        "reconfigure": {
+          "title": "Modifier les options pour {name}",
+          "data": {
+            "thresholds": "Seuils (séparés par des virgules)",
+            "hysteresis": "Hystérésis",
+            "move_delta": "Déclencheur de mouvement de prix",
+            "move_window_min": "Fenêtre de mouvement de prix (minutes)",
+            "daily_change_pct": "Déclencheur de variation journalière (%)",
+            "large_trade_usd": "Seuil de transaction importante (USD)",
+            "volume_spike_pct": "Seuil de pic de volume sur 24h (%)",
+            "closing_soon_hours": "Seuil \"ferme bientôt\" (heures)",
+            "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
+            "extended_hours": "Suivre les heures étendues",
+            "cooldown_min": "Délai de repos par type d'événement (minutes)"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Identifiants invalides.",
+        "cannot_connect": "Impossible de contacter le fournisseur. Réessayez plus tard.",
+        "not_found": "Aucune correspondance trouvée."
+      },
+      "abort": {
+        "already_configured": "Cet instrument est déjà suivi sous ce compte.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      }
+    }
+  },
+  "issues": {
+    "market_not_found": {
+      "title": "Marché Polymarket introuvable",
+      "description": "Le marché suivi {slug} est introuvable sur Polymarket. Il a peut-être été retiré ou archivé. Supprimez l'instrument concerné et rajoutez-le avec un marché valide."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "probability": { "name": "Probabilité" },
+      "last_trade_price": { "name": "Dernier prix négocié" },
+      "spread": { "name": "Spread" },
+      "volume_24hr": { "name": "Volume 24h" },
+      "total_volume": { "name": "Volume total" },
+      "liquidity": { "name": "Liquidité" },
+      "end_date": { "name": "Date de fin" },
+      "resolution_status": {
+        "name": "Statut de résolution",
+        "state": {
+          "open": "Ouvert",
+          "proposed": "Proposé",
+          "disputed": "Contesté",
+          "resolved": "Résolu",
+          "closed": "Fermé"
+        }
+      },
+      "winning_outcome": { "name": "Résultat gagnant" },
+      "price": { "name": "Prix" },
+      "previous_close": { "name": "Clôture précédente" },
+      "market_state": {
+        "name": "État du marché",
+        "state": {
+          "pre": "Avant-bourse",
+          "regular": "Ouvert",
+          "post": "Après-bourse",
+          "closed": "Fermé"
+        }
+      },
+      "rate": { "name": "Taux" }
+    },
+    "binary_sensor": {
+      "closed": { "name": "Fermé" },
+      "accepting_orders": { "name": "Accepte les ordres" },
+      "stream_connected": { "name": "Flux connecté" }
+    },
+    "event": {
+      "detections": { "name": "Détections" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "threshold_crossed": "La valeur a franchi un seuil",
+      "price_move": "Mouvement de prix rapide",
+      "daily_change": "Seuil de variation journalière",
+      "large_trade": "Transaction importante survenue",
+      "volume_spike": "Pic de volume sur 24h",
+      "resolved": "Marché résolu",
+      "closing_soon": "Ferme bientôt",
+      "market_open_gap": "Écart à l'ouverture",
+      "official_rate_published": "Nouveau taux officiel publié"
+    }
+  },
+  "services": {
+    "get_price_history": {
+      "name": "Obtenir l'historique des prix",
+      "description": "Récupère les points de prix historiques d'un instrument suivi.",
+      "fields": {
+        "device_id": { "name": "Appareil", "description": "L'appareil de l'instrument suivi." },
+        "hours": { "name": "Heures", "description": "Nombre d'heures d'historique à récupérer." }
+      }
+    },
+    "refresh": {
+      "name": "Actualiser",
+      "description": "Force une actualisation immédiate des prix pour le compte fournisseur d'un instrument suivi.",
+      "fields": {
+        "device_id": { "name": "Appareil", "description": "L'appareil de l'instrument suivi." }
+      }
+    },
+    "search_instruments": {
+      "name": "Rechercher des instruments",
+      "description": "Recherche des instruments correspondant à une requête chez un fournisseur.",
+      "fields": {
+        "provider": { "name": "Fournisseur", "description": "Quel fournisseur rechercher." },
+        "query": { "name": "Requête", "description": "Texte de recherche." },
+        "limit": { "name": "Limite", "description": "Nombre maximal de résultats." }
+      }
+    }
+  }
+}

@@ -1,14 +1,12 @@
 import { formatChange, formatValue, marketStateLabel, statusBadge } from "./format.js";
 import { filterByKind, groupRows } from "./grouping.js";
+import { DATE_LOCALES, resolveLang, t } from "./i18n.js";
 import { buildRows, changeFromHistory } from "./rows.js";
 import { buildSparklinePath } from "./sparkline.js";
 
 const HISTORY_REFRESH_MS = 60_000;
 
-const GROUP_LABELS = {
-  provider: { polymarket: "Polymarket", finnhub: "Finnhub", alpaca: "Alpaca", fx: "Exchange rates" },
-  kind: { outcome: "Prediction markets", stock: "Stocks", fx: "Exchange rates" },
-};
+const PROVIDER_NAMES = { polymarket: "Polymarket", finnhub: "Finnhub", alpaca: "Alpaca" };
 
 export class MarketSentryCard extends HTMLElement {
   static getConfigElement() {
@@ -82,39 +80,50 @@ export class MarketSentryCard extends HTMLElement {
     const allRows = buildRows(this._hass);
     const filtered = filterByKind(allRows, this._config.kinds);
     const groups = groupRows(filtered, this._config.group_by);
+    const lang = resolveLang(this._hass);
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
       <ha-card>
         ${this._config.title ? `<h1 class="card-header">${escapeHtml(this._config.title)}</h1>` : ""}
         <div class="content">
-          ${groups.length === 0 ? `<div class="empty">No tracked instruments match this card's filters.</div>` : ""}
-          ${groups.map((group) => this._renderGroup(group)).join("")}
+          ${groups.length === 0 ? `<div class="empty">${escapeHtml(t(lang, "empty_card"))}</div>` : ""}
+          ${groups.map((group) => this._renderGroup(group, lang)).join("")}
         </div>
       </ha-card>
     `;
   }
 
-  _renderGroup(group) {
-    const labelMap = GROUP_LABELS[this._config.group_by] || {};
-    const label = group.label != null ? labelMap[group.label] || group.label : null;
+  _groupLabel(value, lang) {
+    if (this._config.group_by === "provider") return PROVIDER_NAMES[value] || (value === "fx" ? t(lang, "group_fx") : value);
+    if (this._config.group_by === "kind") {
+      if (value === "outcome") return t(lang, "group_predictions");
+      if (value === "stock") return t(lang, "group_stocks");
+      if (value === "fx") return t(lang, "group_fx");
+    }
+    return value;
+  }
+
+  _renderGroup(group, lang) {
+    const label = group.label != null ? this._groupLabel(group.label, lang) : null;
     return `
       ${label ? `<div class="group-label">${escapeHtml(label)}</div>` : ""}
-      ${group.rows.map((row) => this._renderRow(row)).join("")}
+      ${group.rows.map((row) => this._renderRow(row, lang)).join("")}
     `;
   }
 
-  _renderRow(row) {
-    return row.kind === "outcome" ? this._renderOutcomeRow(row) : this._renderGenericRow(row);
+  _renderRow(row, lang) {
+    return row.kind === "outcome" ? this._renderOutcomeRow(row, lang) : this._renderGenericRow(row, lang);
   }
 
   /** Polymarket-style row: title, status badge, then a probability bar with the live % and move. */
-  _renderOutcomeRow(row) {
+  _renderOutcomeRow(row, lang) {
     const points = this._history.get(row.entityId) || [];
     const { deltaPp } = changeFromHistory(points);
     const changeText = formatChange(row.kind, null, deltaPp);
     const changeClass = (deltaPp ?? 0) >= 0 ? "positive" : "negative";
-    const badge = statusBadge(row);
+    const badgeId = statusBadge(row);
+    const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);
     const pct = row.value == null ? 0 : Math.min(100, Math.max(0, row.value));
 
@@ -124,7 +133,7 @@ export class MarketSentryCard extends HTMLElement {
           ${href ? `<a href="${href}" target="_blank" rel="noopener">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}
         </div>
         <div class="row-chips">
-          <span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>
+          <span class="badge badge-${slug(badgeId)}">${escapeHtml(badge)}</span>
         </div>
         <div class="prob-line">
           <div class="prob-bar"><div class="prob-fill" style="width:${pct}%"></div></div>
@@ -138,13 +147,14 @@ export class MarketSentryCard extends HTMLElement {
   }
 
   /** Stock/FX row: title + value/change up top, chips + sparkline below. */
-  _renderGenericRow(row) {
+  _renderGenericRow(row, lang) {
     const points = this._history.get(row.entityId) || [];
     const { changePct, deltaPp } = changeFromHistory(points);
     const path = buildSparklinePath(points);
     const changeText = formatChange(row.kind, changePct, deltaPp);
     const changeClass = (deltaPp ?? changePct ?? 0) >= 0 ? "positive" : "negative";
-    const badge = statusBadge(row);
+    const badgeId = statusBadge(row);
+    const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);
 
     return `
@@ -164,11 +174,11 @@ export class MarketSentryCard extends HTMLElement {
               row.kind === "stock"
                 ? // The market-state chip (Pre/Open/After/Closed) is a strict superset of
                   // the Open/Closed status badge for this kind, so skip the redundant badge.
-                  `<span class="chip">${escapeHtml(marketStateLabel(row.marketState))}</span>`
+                  `<span class="chip">${escapeHtml(t(lang, `chip_${marketStateLabel(row.marketState)}`))}</span>`
                 : ""
             }
-            ${row.kind === "fx" ? `<span class="chip">${row.source === "boi" || /boi/.test(row.source || "") ? "Bank of Israel" : "Market"}</span>` : ""}
-            ${row.kind !== "stock" ? `<span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>` : ""}
+            ${row.kind === "fx" ? `<span class="chip">${escapeHtml(row.source === "boi" || /boi/.test(row.source || "") ? t(lang, "fx_boi") : t(lang, "fx_market"))}</span>` : ""}
+            ${row.kind !== "stock" ? `<span class="badge badge-${slug(badgeId)}">${escapeHtml(badge)}</span>` : ""}
           </div>
           <div class="row-spark">
             ${path ? `<svg viewBox="0 0 80 24" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>` : ""}
@@ -201,7 +211,7 @@ function safeUrl(value) {
 }
 
 function slug(text) {
-  return String(text).toLowerCase().replace(/\s+/g, "-");
+  return String(text).toLowerCase().replace(/[\s_]+/g, "-");
 }
 
 const STYLE = `

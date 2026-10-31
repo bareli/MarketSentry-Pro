@@ -51,6 +51,7 @@
   const params = new URLSearchParams(location.search);
   if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
   if (params.get("dir") === "rtl") document.documentElement.dir = "rtl";
+  if (params.get("lang")) document.documentElement.lang = params.get("lang");
 
   const now = Date.now();
   const history = Array.from({ length: 12 }, (_, i) => ({

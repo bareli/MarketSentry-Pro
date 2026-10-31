@@ -1,4 +1,5 @@
 import { formatChange, formatCompactUsd, formatDate, formatValue, marketStateLabel, statusBadge } from "./format.js";
+import { DATE_LOCALES, resolveLang, t } from "./i18n.js";
 import { buildRows, changeFromHistory } from "./rows.js";
 import { buildSparklinePath } from "./sparkline.js";
 
@@ -69,25 +70,27 @@ export class MarketSentryInstrumentCard extends HTMLElement {
     }
 
     const row = this._findRow();
+    const lang = resolveLang(this._hass);
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
       <ha-card>
         <div class="content">
-          ${row ? this._renderBody(row) : `<div class="empty">Entity not found or not a MarketSentry Pro instrument: ${escapeHtml(this._config.entity)}</div>`}
+          ${row ? this._renderBody(row, lang) : `<div class="empty">${escapeHtml(t(lang, "empty_instrument", { entity: this._config.entity }))}</div>`}
         </div>
       </ha-card>
     `;
   }
 
-  _renderBody(row) {
-    return row.kind === "outcome" ? this._renderOutcome(row) : this._renderGeneric(row);
+  _renderBody(row, lang) {
+    return row.kind === "outcome" ? this._renderOutcome(row, lang) : this._renderGeneric(row, lang);
   }
 
-  _renderOutcome(row) {
+  _renderOutcome(row, lang) {
     const { deltaPp } = changeFromHistory(this._history);
     const changeText = formatChange(row.kind, null, deltaPp);
     const changeClass = (deltaPp ?? 0) >= 0 ? "positive" : "negative";
-    const badge = statusBadge(row);
+    const badgeId = statusBadge(row);
+    const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);
     const pct = row.value == null ? 0 : Math.min(100, Math.max(0, row.value));
 
@@ -96,7 +99,7 @@ export class MarketSentryInstrumentCard extends HTMLElement {
         ${href ? `<a href="${href}" target="_blank" rel="noopener">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}
       </div>
       <div class="chips">
-        <span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>
+        <span class="badge badge-${slug(badgeId)}">${escapeHtml(badge)}</span>
       </div>
       <div class="prob-line">
         <div class="prob-bar"><div class="prob-fill" style="width:${pct}%"></div></div>
@@ -106,19 +109,20 @@ export class MarketSentryInstrumentCard extends HTMLElement {
         </div>
       </div>
       <div class="stats">
-        <div class="stat"><span class="stat-label">Volume 24h</span><span class="stat-value" dir="ltr">${formatCompactUsd(row.volume24hr)}</span></div>
-        <div class="stat"><span class="stat-label">Liquidity</span><span class="stat-value" dir="ltr">${formatCompactUsd(row.liquidity)}</span></div>
+        <div class="stat"><span class="stat-label">${escapeHtml(t(lang, "stat_volume_24h"))}</span><span class="stat-value" dir="ltr">${formatCompactUsd(row.volume24hr)}</span></div>
+        <div class="stat"><span class="stat-label">${escapeHtml(t(lang, "stat_liquidity"))}</span><span class="stat-value" dir="ltr">${formatCompactUsd(row.liquidity)}</span></div>
       </div>
-      <div class="footer">Ends ${escapeHtml(formatDate(row.endDate))}</div>
+      <div class="footer">${escapeHtml(t(lang, "footer_ends", { date: formatDate(row.endDate, DATE_LOCALES[lang]) }))}</div>
     `;
   }
 
-  _renderGeneric(row) {
+  _renderGeneric(row, lang) {
     const { changePct, deltaPp } = changeFromHistory(this._history);
     const path = buildSparklinePath(this._history, 280, 60);
     const changeText = formatChange(row.kind, changePct, deltaPp);
     const changeClass = (deltaPp ?? changePct ?? 0) >= 0 ? "positive" : "negative";
-    const badge = statusBadge(row);
+    const badgeId = statusBadge(row);
+    const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);
 
     return `
@@ -130,11 +134,11 @@ export class MarketSentryInstrumentCard extends HTMLElement {
           row.kind === "stock"
             ? // The market-state chip (Pre/Open/After/Closed) is a strict superset of
               // the Open/Closed status badge for this kind, so skip the redundant badge.
-              `<span class="chip">${escapeHtml(marketStateLabel(row.marketState))}</span>`
+              `<span class="chip">${escapeHtml(t(lang, `chip_${marketStateLabel(row.marketState)}`))}</span>`
             : ""
         }
-        ${row.kind === "fx" ? `<span class="chip">${row.source === "boi" || /boi/.test(row.source || "") ? "Bank of Israel" : "Market"}</span>` : ""}
-        ${row.kind !== "stock" ? `<span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>` : ""}
+        ${row.kind === "fx" ? `<span class="chip">${escapeHtml(row.source === "boi" || /boi/.test(row.source || "") ? t(lang, "fx_boi") : t(lang, "fx_market"))}</span>` : ""}
+        ${row.kind !== "stock" ? `<span class="badge badge-${slug(badgeId)}">${escapeHtml(badge)}</span>` : ""}
       </div>
       <div class="big-value">
         <span class="value" dir="ltr">${escapeHtml(formatValue(row.kind, row.value, row.unit))}</span>
@@ -143,8 +147,8 @@ export class MarketSentryInstrumentCard extends HTMLElement {
       <div class="big-spark">
         ${path ? `<svg viewBox="0 0 280 60" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" /></svg>` : ""}
       </div>
-      ${row.kind === "stock" ? `<div class="stats"><div class="stat"><span class="stat-label">Prev close</span><span class="stat-value" dir="ltr">${escapeHtml(formatValue(row.kind, row.previousClose, row.unit))}</span></div></div>` : ""}
-      ${row.kind === "fx" ? `<div class="footer">Published ${escapeHtml(formatDate(row.publishedDate))}</div>` : ""}
+      ${row.kind === "stock" ? `<div class="stats"><div class="stat"><span class="stat-label">${escapeHtml(t(lang, "stat_prev_close"))}</span><span class="stat-value" dir="ltr">${escapeHtml(formatValue(row.kind, row.previousClose, row.unit))}</span></div></div>` : ""}
+      ${row.kind === "fx" ? `<div class="footer">${escapeHtml(t(lang, "footer_published", { date: formatDate(row.publishedDate, DATE_LOCALES[lang]) }))}</div>` : ""}
     `;
   }
 }
@@ -169,7 +173,7 @@ function safeUrl(value) {
 }
 
 function slug(text) {
-  return String(text).toLowerCase().replace(/\s+/g, "-");
+  return String(text).toLowerCase().replace(/[\s_]+/g, "-");
 }
 
 const STYLE = `

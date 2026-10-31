@@ -72,3 +72,15 @@ test("instrument card: fx kind shows the published date", async ({ page }) => {
   await expect(card.locator(".value").first()).toHaveText("3.9123 ILS");
   await expect(card.locator(".footer")).toContainText("Published");
 });
+
+test("renders in Hebrew when hass's language is he", async ({ page }) => {
+  await openHarness(page, "?lang=he&dir=rtl");
+  const list = page.locator("marketsentry-card");
+  const groupLabels = await list.locator(".group-label").allTextContents();
+  expect(groupLabels).toContain("שוקי חיזוי"); // "Prediction markets"
+  expect(groupLabels).toContain("מניות"); // "Stocks"
+  expect(groupLabels).toContain("שערי חליפין"); // "Exchange rates"
+
+  const stockCard = page.locator("#instrument-stock");
+  await expect(stockCard.locator(".stat-label")).toHaveText("סגירה קודמת"); // "Prev close"
+});

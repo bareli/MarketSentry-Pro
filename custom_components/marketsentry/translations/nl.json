@@ -1,0 +1,190 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aanbiederaccount toevoegen",
+        "description": "Kies welke marktdataleverancier dit account volgt. Inloggegevens (indien nodig) worden eenmalig ingevoerd; instrumenten worden daarna toegevoegd zonder ze opnieuw op te geven.",
+        "data": {
+          "provider": "Aanbieder"
+        }
+      },
+      "finnhub_credentials": {
+        "title": "Finnhub API-sleutel",
+        "description": "Finnhubs gratis laag is alleen voor persoonlijk, niet-commercieel gebruik. Haal een gratis sleutel op finnhub.io.",
+        "data": {
+          "api_key": "API-sleutel"
+        }
+      },
+      "alpaca_credentials": {
+        "title": "Alpaca API-gegevens",
+        "description": "Gratis Basic-plan: alleen IEX-feed, niet de geconsolideerde tape.",
+        "data": {
+          "key_id": "Sleutel-ID",
+          "secret_key": "Geheime sleutel",
+          "feed": "Feed"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Ongeldige inloggegevens.",
+      "cannot_connect": "Kon de aanbieder niet bereiken. Probeer het later opnieuw."
+    },
+    "abort": {
+      "already_configured": "Dit aanbiederaccount is al geconfigureerd."
+    }
+  },
+  "config_subentries": {
+    "instrument": {
+      "entry_type": "Instrument",
+      "initiate_flow": {
+        "user": "Instrument toevoegen",
+        "reconfigure": "Instrumentopties bewerken"
+      },
+      "step": {
+        "user": {
+          "title": "Een instrument volgen",
+          "description": "Plak een URL/slug (Polymarket), ticker (aandelen) of paar zoals EUR/ILS (FX; voeg /boi toe voor de officiële koers van de Bank of Israel in plaats van de marktkoers). Vrije tekst werkt ook als zoekopdracht.",
+          "data": {
+            "url_or_query": "URL, ticker of paar"
+          }
+        },
+        "select": {
+          "title": "Meerdere overeenkomsten",
+          "description": "Kies er een. Voer \"Instrument toevoegen\" opnieuw uit voor de rest.",
+          "data": {
+            "instrument": "Instrument"
+          }
+        },
+        "confirm": {
+          "title": "Bevestigen en drempels instellen",
+          "description": "Volgt **{name}** ({symbol}).",
+          "data": {
+            "thresholds": "Drempels (komma-gescheiden)",
+            "hysteresis": "Hysterese",
+            "move_delta": "Trigger prijsbeweging",
+            "move_window_min": "Venster prijsbeweging (minuten)",
+            "daily_change_pct": "Trigger dagverandering (%)",
+            "large_trade_usd": "Drempel grote transactie (USD)",
+            "volume_spike_pct": "Drempel 24u volumepiek (%)",
+            "closing_soon_hours": "Drempel \"sluit binnenkort\" (uren)",
+            "market_open_gap_pct": "Drempel openingsgat (%)",
+            "extended_hours": "Verlengde handelsuren volgen",
+            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+          }
+        },
+        "reconfigure": {
+          "title": "Opties bewerken voor {name}",
+          "data": {
+            "thresholds": "Drempels (komma-gescheiden)",
+            "hysteresis": "Hysterese",
+            "move_delta": "Trigger prijsbeweging",
+            "move_window_min": "Venster prijsbeweging (minuten)",
+            "daily_change_pct": "Trigger dagverandering (%)",
+            "large_trade_usd": "Drempel grote transactie (USD)",
+            "volume_spike_pct": "Drempel 24u volumepiek (%)",
+            "closing_soon_hours": "Drempel \"sluit binnenkort\" (uren)",
+            "market_open_gap_pct": "Drempel openingsgat (%)",
+            "extended_hours": "Verlengde handelsuren volgen",
+            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Ongeldige inloggegevens.",
+        "cannot_connect": "Kon de aanbieder niet bereiken. Probeer het later opnieuw.",
+        "not_found": "Geen overeenkomst gevonden."
+      },
+      "abort": {
+        "already_configured": "Dit instrument wordt al gevolgd onder dit account.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      }
+    }
+  },
+  "issues": {
+    "market_not_found": {
+      "title": "Polymarket-markt niet gevonden",
+      "description": "De gevolgde markt {slug} kon niet worden gevonden op Polymarket. Deze is mogelijk verwijderd of gearchiveerd. Verwijder het betreffende instrument en voeg het opnieuw toe met een geldige markt."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "probability": { "name": "Waarschijnlijkheid" },
+      "last_trade_price": { "name": "Laatste handelsprijs" },
+      "spread": { "name": "Spread" },
+      "volume_24hr": { "name": "24u volume" },
+      "total_volume": { "name": "Totaal volume" },
+      "liquidity": { "name": "Liquiditeit" },
+      "end_date": { "name": "Einddatum" },
+      "resolution_status": {
+        "name": "Afwikkelingsstatus",
+        "state": {
+          "open": "Open",
+          "proposed": "Voorgesteld",
+          "disputed": "Betwist",
+          "resolved": "Afgewikkeld",
+          "closed": "Gesloten"
+        }
+      },
+      "winning_outcome": { "name": "Winnende uitkomst" },
+      "price": { "name": "Prijs" },
+      "previous_close": { "name": "Vorige slotkoers" },
+      "market_state": {
+        "name": "Marktstatus",
+        "state": {
+          "pre": "Voorbeurs",
+          "regular": "Open",
+          "post": "Naborsbeurs",
+          "closed": "Gesloten"
+        }
+      },
+      "rate": { "name": "Koers" }
+    },
+    "binary_sensor": {
+      "closed": { "name": "Gesloten" },
+      "accepting_orders": { "name": "Accepteert orders" },
+      "stream_connected": { "name": "Stream verbonden" }
+    },
+    "event": {
+      "detections": { "name": "Detecties" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "threshold_crossed": "Waarde heeft drempel overschreden",
+      "price_move": "Snelle prijsbeweging",
+      "daily_change": "Drempel dagverandering",
+      "large_trade": "Grote transactie opgetreden",
+      "volume_spike": "24u volumepiek",
+      "resolved": "Markt afgewikkeld",
+      "closing_soon": "Sluit binnenkort",
+      "market_open_gap": "Openingsgat",
+      "official_rate_published": "Nieuwe officiële koers gepubliceerd"
+    }
+  },
+  "services": {
+    "get_price_history": {
+      "name": "Prijsgeschiedenis ophalen",
+      "description": "Haalt historische prijspunten op voor een gevolgd instrument.",
+      "fields": {
+        "device_id": { "name": "Apparaat", "description": "Het apparaat van het gevolgde instrument." },
+        "hours": { "name": "Uren", "description": "Hoeveel uur geschiedenis op te halen." }
+      }
+    },
+    "refresh": {
+      "name": "Vernieuwen",
+      "description": "Forceert een directe prijsvernieuwing voor het aanbiederaccount van een gevolgd instrument.",
+      "fields": {
+        "device_id": { "name": "Apparaat", "description": "Het apparaat van het gevolgde instrument." }
+      }
+    },
+    "search_instruments": {
+      "name": "Instrumenten zoeken",
+      "description": "Doorzoekt een aanbieder op instrumenten die overeenkomen met een zoekopdracht.",
+      "fields": {
+        "provider": { "name": "Aanbieder", "description": "Welke aanbieder te doorzoeken." },
+        "query": { "name": "Zoekopdracht", "description": "Zoektekst." },
+        "limit": { "name": "Limiet", "description": "Maximum aantal resultaten." }
+      }
+    }
+  }
+}

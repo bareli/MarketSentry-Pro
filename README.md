@@ -141,6 +141,15 @@ stock provider page; none for FX). Configurable via the UI editor too.
 - `marketsentry.refresh` — force an immediate price refresh for a tracked instrument's provider account.
 - `marketsentry.search_instruments` — search a provider by free text (provider, query, limit). Returns response data; usable from Assist/LLM tooling.
 
+## Languages
+
+The backend (config flow, entities, device triggers, services) and the
+`marketsentry-card`/`marketsentry-instrument-card` frontend are both
+translated into English, Hebrew, German, French, Spanish, Portuguese
+(Brazil), Italian and Dutch, following Home Assistant's own UI language
+setting. The card falls back to the closest supported base language (e.g.
+`de-AT` → `de`) and then to English for anything unsupported.
+
 ## Diagnostics
 
 Each config entry exposes a diagnostics download (Settings > Devices & services > MarketSentry Pro > entry > Download diagnostics) with provider/stream connection state and per-instrument quote state. Finnhub/Alpaca credentials in the entry's stored data are redacted; every price endpoint itself is public.
