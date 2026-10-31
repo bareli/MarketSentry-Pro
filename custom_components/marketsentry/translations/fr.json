@@ -70,11 +70,13 @@
             "closing_soon_hours": "Seuil \"ferme bientôt\" (heures)",
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
-            "cooldown_min": "Délai de repos par type d'événement (minutes)"
+            "cooldown_min": "Délai de repos par type d'événement (minutes)",
+            "quantity": "Quantité détenue"
           },
           "data_description": {
             "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
-            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument."
+            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument.",
+            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Seuil \"ferme bientôt\" (heures)",
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
-            "cooldown_min": "Délai de repos par type d'événement (minutes)"
+            "cooldown_min": "Délai de repos par type d'événement (minutes)",
+            "quantity": "Quantité détenue"
           },
           "data_description": {
             "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
-            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument."
+            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument.",
+            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Fermé"
         }
       },
-      "rate": { "name": "Taux" }
+      "rate": { "name": "Taux" },
+      "outcomes_total": { "name": "Total des résultats" },
+      "stocks_total": { "name": "Total des actions" },
+      "crypto_total": { "name": "Total crypto" },
+      "fx_total": { "name": "Total des devises" }
     },
     "binary_sensor": {
       "closed": { "name": "Fermé" },

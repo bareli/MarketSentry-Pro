@@ -69,7 +69,8 @@
             "closing_soon_hours": "Closing soon threshold (hours)",
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
-            "cooldown_min": "Cooldown per event type (minutes)"
+            "cooldown_min": "Cooldown per event type (minutes)",
+            "quantity": "Quantity held"
           }
         },
         "reconfigure": {
@@ -85,7 +86,8 @@
             "closing_soon_hours": "Closing soon threshold (hours)",
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
-            "cooldown_min": "Cooldown per event type (minutes)"
+            "cooldown_min": "Cooldown per event type (minutes)",
+            "quantity": "Quantity held"
           }
         }
       },
@@ -137,7 +139,11 @@
           "closed": "Closed"
         }
       },
-      "rate": { "name": "Rate" }
+      "rate": { "name": "Rate" },
+      "outcomes_total": { "name": "Outcomes total" },
+      "stocks_total": { "name": "Stocks total" },
+      "crypto_total": { "name": "Crypto total" },
+      "fx_total": { "name": "FX total" }
     },
     "binary_sensor": {
       "closed": { "name": "Closed" },

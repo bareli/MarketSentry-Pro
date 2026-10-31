@@ -70,11 +70,13 @@
             "closing_soon_hours": "Drempel \"sluit binnenkort\" (uren)",
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
-            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)",
+            "quantity": "Aangehouden hoeveelheid"
           },
           "data_description": {
             "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
-            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf."
+            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf.",
+            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Drempel \"sluit binnenkort\" (uren)",
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
-            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+            "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)",
+            "quantity": "Aangehouden hoeveelheid"
           },
           "data_description": {
             "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
-            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf."
+            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf.",
+            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Gesloten"
         }
       },
-      "rate": { "name": "Koers" }
+      "rate": { "name": "Koers" },
+      "outcomes_total": { "name": "Totaal uitkomsten" },
+      "stocks_total": { "name": "Totaal aandelen" },
+      "crypto_total": { "name": "Totaal crypto" },
+      "fx_total": { "name": "Totaal valuta" }
     },
     "binary_sensor": {
       "closed": { "name": "Gesloten" },

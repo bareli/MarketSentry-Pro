@@ -343,3 +343,67 @@ async def test_instrument_subentry_reconfigure_updates_options(hass: HomeAssista
     updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
     assert updated.data["options"]["thresholds"] == [150.0, 160.0]
     assert updated.data["options"]["cooldown_min"] == 30
+
+
+async def test_instrument_subentry_quantity_option_round_trips(hass: HomeAssistant) -> None:
+    """ENH-011: the optional "quantity held" field, same string-encoded-in-
+    the-form/parsed-to-float-or-None pattern as `thresholds`. A blank value
+    must parse to `None` (not 0), so a pure-watchlist instrument is
+    unaffected, and a previously-set value must come back as the
+    reconfigure form's own default (`_options_schema` reading back what
+    `_parse_options_form` stored)."""
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref()],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            "thresholds": "",
+            "hysteresis": 0.0,
+            "move_delta": 2.0,
+            "move_window_min": 60,
+            "cooldown_min": 15,
+            "quantity": "12.5",
+        },
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"]["options"]["quantity"] == 12.5
+
+    live_entry = hass.config_entries.async_get_entry(entry.entry_id)
+    subentry = next(iter(live_entry.subentries.values()))
+
+    reconfig = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT),
+        context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
+    )
+    assert reconfig["step_id"] == "reconfigure"
+    # The 12.5 just stored is re-offered as the form's own default.
+    assert reconfig["data_schema"]({})["quantity"] == "12.5"
+
+    cleared = await hass.config_entries.subentries.async_configure(
+        reconfig["flow_id"],
+        {
+            "thresholds": "",
+            "hysteresis": 0.0,
+            "move_delta": 2.0,
+            "move_window_min": 60,
+            "cooldown_min": 15,
+            "quantity": "",
+        },
+    )
+    assert cleared["type"] == data_entry_flow.FlowResultType.ABORT
+    assert cleared["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
+    assert updated.data["options"]["quantity"] is None

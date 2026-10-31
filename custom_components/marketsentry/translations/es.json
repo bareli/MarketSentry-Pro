@@ -70,11 +70,13 @@
             "closing_soon_hours": "Umbral de \"cierra pronto\" (horas)",
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
-            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)",
+            "quantity": "Cantidad en posesión"
           },
           "data_description": {
             "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
-            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento."
+            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento.",
+            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Umbral de \"cierra pronto\" (horas)",
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
-            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)",
+            "quantity": "Cantidad en posesión"
           },
           "data_description": {
             "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
-            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento."
+            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento.",
+            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Cerrado"
         }
       },
-      "rate": { "name": "Tipo de cambio" }
+      "rate": { "name": "Tipo de cambio" },
+      "outcomes_total": { "name": "Total de resultados" },
+      "stocks_total": { "name": "Total de acciones" },
+      "crypto_total": { "name": "Total de criptomonedas" },
+      "fx_total": { "name": "Total de divisas" }
     },
     "binary_sensor": {
       "closed": { "name": "Cerrado" },
