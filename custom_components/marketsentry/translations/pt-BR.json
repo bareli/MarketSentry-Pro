@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Adicionar uma conta de provedor",
-        "description": "Escolha qual provedor de dados de mercado esta conta acompanha. As credenciais (se necessárias) são inseridas uma vez; os instrumentos são adicionados depois sem pedi-las novamente.",
+        "description": "Escolha qual provedor de dados de mercado esta conta acompanha. As credenciais (se necessárias) são inseridas uma vez; os instrumentos são adicionados depois sem pedi-las novamente. Polymarket, CoinGecko e Exchange rates não precisam de conta nem chave de API - escolha um deles primeiro se você só quer ver funcionando.",
         "data": {
           "provider": "Provedor"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Credenciais inválidas.",
+      "invalid_auth_finnhub": "Chave de API da Finnhub inválida. Verifique se você copiou a chave completa do finnhub.io, sem espaços extras.",
+      "invalid_auth_alpaca": "ID de chave ou chave secreta da Alpaca inválida. Verifique se ambas foram copiadas por completo da página de chaves de API da sua conta Alpaca.",
       "cannot_connect": "Não foi possível contatar o provedor. Tente novamente mais tarde."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
             "cooldown_min": "Tempo de espera por tipo de evento (minutos)"
+          },
+          "data_description": {
+            "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
+            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
             "cooldown_min": "Tempo de espera por tipo de evento (minutos)"
+          },
+          "data_description": {
+            "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
+            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento."
           }
         }
       },

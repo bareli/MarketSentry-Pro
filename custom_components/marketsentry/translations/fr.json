@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Ajouter un compte fournisseur",
-        "description": "Choisissez le fournisseur de données de marché suivi par ce compte. Les identifiants (si nécessaires) sont saisis une seule fois ; les instruments sont ajoutés ensuite sans les ressaisir.",
+        "description": "Choisissez le fournisseur de données de marché suivi par ce compte. Les identifiants (si nécessaires) sont saisis une seule fois ; les instruments sont ajoutés ensuite sans les ressaisir. Polymarket, CoinGecko et Exchange rates ne nécessitent ni compte ni clé API : choisissez-en un si vous voulez juste voir ça fonctionner tout de suite.",
         "data": {
           "provider": "Fournisseur"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Identifiants invalides.",
+      "invalid_auth_finnhub": "Clé API Finnhub invalide. Vérifiez que vous avez copié la clé entière depuis finnhub.io, sans espace supplémentaire.",
+      "invalid_auth_alpaca": "ID de clé ou clé secrète Alpaca invalide. Vérifiez que les deux ont été copiés intégralement depuis la page des clés API de votre compte Alpaca.",
       "cannot_connect": "Impossible de contacter le fournisseur. Réessayez plus tard."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
             "cooldown_min": "Délai de repos par type d'événement (minutes)"
+          },
+          "data_description": {
+            "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
+            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
             "cooldown_min": "Délai de repos par type d'événement (minutes)"
+          },
+          "data_description": {
+            "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
+            "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument."
           }
         }
       },

@@ -174,7 +174,7 @@ class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await provider.validate(user_input)
             except InvalidAuth:
-                errors["base"] = "invalid_auth"
+                errors["base"] = "invalid_auth_finnhub"
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             else:
@@ -183,7 +183,13 @@ class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={CONF_PROVIDER: "finnhub", CONF_API_KEY: user_input[CONF_API_KEY]},
                 )
 
-        schema = vol.Schema({vol.Required(CONF_API_KEY): str})
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_API_KEY): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                )
+            }
+        )
         return self.async_show_form(
             step_id="finnhub_credentials", data_schema=schema, errors=errors
         )
@@ -198,7 +204,7 @@ class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await provider.validate(user_input)
             except InvalidAuth:
-                errors["base"] = "invalid_auth"
+                errors["base"] = "invalid_auth_alpaca"
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             else:
@@ -214,8 +220,12 @@ class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_KEY_ID): str,
-                vol.Required(CONF_SECRET_KEY): str,
+                vol.Required(CONF_KEY_ID): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(CONF_SECRET_KEY): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
                 vol.Optional(CONF_FEED, default="iex"): vol.In(["iex", "sip"]),
             }
         )

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Aanbiederaccount toevoegen",
-        "description": "Kies welke marktdataleverancier dit account volgt. Inloggegevens (indien nodig) worden eenmalig ingevoerd; instrumenten worden daarna toegevoegd zonder ze opnieuw op te geven.",
+        "description": "Kies welke marktdataleverancier dit account volgt. Inloggegevens (indien nodig) worden eenmalig ingevoerd; instrumenten worden daarna toegevoegd zonder ze opnieuw op te geven. Polymarket, CoinGecko en Exchange rates hebben geen account of API-sleutel nodig - kies er eerst een van als je het alleen maar wilt zien werken.",
         "data": {
           "provider": "Aanbieder"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Ongeldige inloggegevens.",
+      "invalid_auth_finnhub": "Ongeldige Finnhub API-sleutel. Controleer of je de volledige sleutel van finnhub.io hebt gekopieerd, zonder extra spaties.",
+      "invalid_auth_alpaca": "Ongeldige Alpaca sleutel-ID of geheime sleutel. Controleer of beide volledig zijn gekopieerd van de API-sleutelpagina van je Alpaca-account.",
       "cannot_connect": "Kon de aanbieder niet bereiken. Probeer het later opnieuw."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
             "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+          },
+          "data_description": {
+            "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
+            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
             "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)"
+          },
+          "data_description": {
+            "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
+            "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf."
           }
         }
       },

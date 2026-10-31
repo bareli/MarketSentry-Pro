@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Añadir una cuenta de proveedor",
-        "description": "Elige qué proveedor de datos de mercado sigue esta cuenta. Las credenciales (si son necesarias) se introducen una vez; los instrumentos se añaden después sin volver a pedirlas.",
+        "description": "Elige qué proveedor de datos de mercado sigue esta cuenta. Las credenciales (si son necesarias) se introducen una vez; los instrumentos se añaden después sin volver a pedirlas. Polymarket, CoinGecko y Exchange rates no necesitan cuenta ni clave API: elige uno de ellos primero si solo quieres verlo funcionando.",
         "data": {
           "provider": "Proveedor"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Credenciales no válidas.",
+      "invalid_auth_finnhub": "Clave API de Finnhub no válida. Comprueba que copiaste la clave completa de finnhub.io sin espacios adicionales.",
+      "invalid_auth_alpaca": "ID de clave o clave secreta de Alpaca no válida. Comprueba que ambas se copiaron completas desde la página de claves API de tu cuenta de Alpaca.",
       "cannot_connect": "No se pudo contactar con el proveedor. Inténtalo más tarde."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
             "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+          },
+          "data_description": {
+            "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
+            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
             "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+          },
+          "data_description": {
+            "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
+            "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento."
           }
         }
       },
