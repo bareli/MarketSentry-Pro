@@ -80,6 +80,30 @@ async def test_fetch_snapshot_computes_mid_from_bid_ask(aiohttp_client) -> None:
     assert quotes["AAPL"].ask == 150.5
 
 
+async def test_fetch_snapshot_one_bad_ref_should_not_drop_the_others(aiohttp_client) -> None:
+    """PROV-06 regression: a single ref's failure must not abort the whole
+    snapshot, matching the per-ref degradation FxProvider/CryptoProvider/
+    PolymarketProvider already implement. Alpaca's fetch_snapshot has no
+    per-ref try/except, so today this raises instead of returning a partial
+    dict - see qa/plans/PROV-providers.md PROV-06."""
+
+    async def handler(request: web.Request) -> web.Response:
+        if request.path.endswith("/BAD/quotes/latest"):
+            return web.Response(status=500)
+        return web.json_response({"quote": {"bp": 149.5, "ap": 150.5, "t": "2026-01-01T15:00:00Z"}})
+
+    app = web.Application()
+    app.router.add_get("/stocks/{symbol}/quotes/latest", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    good_ref = InstrumentRef(provider="alpaca", id="AAPL", symbol="AAPL", name="AAPL", kind="stock", unit="USD")
+    bad_ref = InstrumentRef(provider="alpaca", id="BAD", symbol="BAD", name="BAD", kind="stock", unit="USD")
+
+    quotes = await provider.fetch_snapshot([good_ref, bad_ref])
+
+    assert "AAPL" in quotes, "a healthy ref's quote was dropped because another ref in the same batch failed"
+
+
 async def test_fetch_history_parses_bars(aiohttp_client) -> None:
     async def handler(request: web.Request) -> web.Response:
         return web.json_response(

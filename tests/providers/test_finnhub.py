@@ -77,6 +77,31 @@ async def test_fetch_snapshot_parses_quote_fields(aiohttp_client) -> None:
     assert quotes["AAPL"].previous_close == 149.3
 
 
+async def test_fetch_snapshot_one_bad_ref_should_not_drop_the_others(aiohttp_client) -> None:
+    """PROV-06 regression: a single ref's failure must not abort the whole
+    snapshot, matching the per-ref degradation FxProvider/CryptoProvider/
+    PolymarketProvider already implement. Finnhub's fetch_snapshot has no
+    per-ref try/except, so today this raises instead of returning a partial
+    dict - see qa/plans/PROV-providers.md PROV-06."""
+
+    async def handler(request: web.Request) -> web.Response:
+        symbol = request.query["symbol"]
+        if symbol == "BAD":
+            return web.Response(status=500)
+        return web.json_response({"c": 150.5, "pc": 149.3, "t": 1700000000})
+
+    app = web.Application()
+    app.router.add_get("/quote", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    good_ref = InstrumentRef(provider="finnhub", id="AAPL", symbol="AAPL", name="Apple", kind="stock", unit="USD")
+    bad_ref = InstrumentRef(provider="finnhub", id="BAD", symbol="BAD", name="Bad", kind="stock", unit="USD")
+
+    quotes = await provider.fetch_snapshot([good_ref, bad_ref])
+
+    assert "AAPL" in quotes, "a healthy ref's quote was dropped because another ref in the same batch failed"
+
+
 async def test_fetch_history_returns_empty_when_no_data(aiohttp_client) -> None:
     async def handler(request: web.Request) -> web.Response:
         return web.json_response({"s": "no_data"})
