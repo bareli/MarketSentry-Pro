@@ -37,7 +37,7 @@ variables:
     No MarketSentry Pro instruments are tracked yet.
     {%- else -%}
     {% for s in tracked -%}
-    {{ s.attributes.friendly_name }}: {{ s.state }}{{ ' ' ~ s.attributes.unit_of_measurement if s.attributes.unit_of_measurement else '' }}
+    {{ s.attributes.friendly_name | truncate(60, True, '…') }}: {{ s.state }}{{ ' ' ~ s.attributes.unit_of_measurement if s.attributes.unit_of_measurement else '' }}
     {% endfor -%}
     {%- endif %}
 
