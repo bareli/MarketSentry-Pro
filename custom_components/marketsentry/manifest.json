@@ -3,7 +3,7 @@
   "name": "MarketSentry Pro",
   "codeowners": ["@bareli"],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": ["http", "frontend"],
   "documentation": "https://github.com/bareli/MarketSentry-Pro",
   "integration_type": "service",
   "iot_class": "cloud_push",
