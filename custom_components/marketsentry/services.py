@@ -22,7 +22,7 @@ from .const import (
     SERVICE_SEARCH_INSTRUMENTS,
 )
 from .providers import PROVIDERS, build_provider
-from .providers.base import CannotConnect, InvalidAuth
+from .providers.base import CannotConnect, InstrumentRef, InvalidAuth
 
 if TYPE_CHECKING:
     from . import InstrumentTracker, MarketSentryConfigEntry
@@ -64,6 +64,38 @@ def _find_tracker_for_device(
     raise ValueError(f"No tracked instrument found for device_id: {device_id}")
 
 
+async def async_search_instruments(
+    hass: HomeAssistant, provider_key: str, query: str, limit: int
+) -> list[InstrumentRef]:
+    """Search a provider for instruments matching a free-text query.
+
+    Shared by the `search_instruments` service (`handle_search_instruments`
+    below) and the `SearchInstruments` Assist/LLM-tool intent in `intent.py`
+    (ENH-015), so both call paths run the exact same lookup/credential logic.
+    """
+    session = async_get_clientsession(hass)
+
+    credentials: dict[str, object] = {}
+    if PROVIDERS[provider_key].requires_api_key:
+        entry = next(
+            (
+                e
+                for e in hass.config_entries.async_entries(DOMAIN)
+                if e.data.get(CONF_PROVIDER) == provider_key
+            ),
+            None,
+        )
+        if entry is None:
+            raise ValueError(f"No configured {provider_key} account found")
+        credentials = dict(entry.data)
+
+    provider = build_provider(session, provider_key, credentials)
+    try:
+        return await provider.search(query, limit)
+    except (CannotConnect, InvalidAuth) as err:
+        raise ValueError(str(err)) from err
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register domain services. Safe to call multiple times (no-op after first)."""
     if hass.services.has_service(DOMAIN, SERVICE_GET_PRICE_HISTORY):
@@ -86,28 +118,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         return None
 
     async def handle_search_instruments(call: ServiceCall) -> ServiceResponse:
-        provider_key = call.data[CONF_PROVIDER]
-        session = async_get_clientsession(hass)
-
-        credentials: dict[str, object] = {}
-        if PROVIDERS[provider_key].requires_api_key:
-            entry = next(
-                (
-                    e
-                    for e in hass.config_entries.async_entries(DOMAIN)
-                    if e.data.get(CONF_PROVIDER) == provider_key
-                ),
-                None,
-            )
-            if entry is None:
-                raise ValueError(f"No configured {provider_key} account found")
-            credentials = dict(entry.data)
-
-        provider = build_provider(session, provider_key, credentials)
-        try:
-            refs = await provider.search(call.data[ATTR_QUERY], call.data.get(ATTR_LIMIT, 10))
-        except (CannotConnect, InvalidAuth) as err:
-            raise ValueError(str(err)) from err
+        refs = await async_search_instruments(
+            hass,
+            call.data[CONF_PROVIDER],
+            call.data[ATTR_QUERY],
+            call.data.get(ATTR_LIMIT, 10),
+        )
 
         instruments = [
             {

@@ -68,6 +68,7 @@ from .detector import (
     ThresholdDetector,
     VolumeSpikeDetector,
 )
+from .intent import async_setup_intents
 from .market_calendar import market_state as calc_market_state
 from .providers import PROVIDERS, build_provider
 from .providers.base import InstrumentRef, Provider, ProviderEvent, Quote, StreamStatus, Trade
@@ -176,8 +177,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, _config: Any) -> bool:
-    """Domain-wide setup: WS command + the bundled marketsentry-card, once."""
+    """Domain-wide setup: WS command, the bundled marketsentry-card, and the
+    search_instruments Assist/LLM-tool intent (ENH-015), once."""
     async_setup_websocket_api(hass)
+    async_setup_intents(hass)
 
     card_file = Path(__file__).parent / "www" / "marketsentry-card.js"
     if card_file.exists():
