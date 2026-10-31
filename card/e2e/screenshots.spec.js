@@ -45,3 +45,30 @@ test("outcome row links out to Polymarket, FX row has no link", async ({ page })
   const fxRow = rows.filter({ hasText: "EUR/ILS" });
   await expect(fxRow.locator("a")).toHaveCount(0);
 });
+
+test("instrument card: outcome kind shows a probability bar and volume/liquidity stats", async ({ page }) => {
+  await openHarness(page);
+  const card = page.locator("#instrument-outcome");
+  await expect(card.locator(".prob-bar")).toBeVisible();
+  await expect(card.locator(".value")).toHaveText("62.3%");
+  const statLabels = await card.locator(".stat-label").allTextContents();
+  expect(statLabels).toEqual(["Volume 24h", "Liquidity"]);
+  const statValues = await card.locator(".stat-value").allTextContents();
+  expect(statValues).toEqual(["$1.2M", "$340.0K"]);
+});
+
+test("instrument card: stock kind shows a sparkline and previous close", async ({ page }) => {
+  await openHarness(page);
+  const card = page.locator("#instrument-stock");
+  await expect(card.locator(".big-spark svg")).toBeVisible();
+  await expect(card.locator(".value").first()).toHaveText("$150.52");
+  await expect(card.locator(".stat-label")).toHaveText("Prev close");
+  await expect(card.locator(".stat-value")).toHaveText("$148.20");
+});
+
+test("instrument card: fx kind shows the published date", async ({ page }) => {
+  await openHarness(page);
+  const card = page.locator("#instrument-fx");
+  await expect(card.locator(".value").first()).toHaveText("3.9123 ILS");
+  await expect(card.locator(".footer")).toContainText("Published");
+});

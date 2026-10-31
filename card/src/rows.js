@@ -48,12 +48,18 @@ export function buildRows(hass) {
       marketState: null,
       publishedDate: attrs.published_date ?? null,
       source: attrs.source ?? null,
+      volume24hr: null,
+      liquidity: null,
+      previousClose: null,
     };
 
     for (const sibling of allEntities) {
       if (sibling.device_id !== entity.device_id) continue;
       const siblingState = hass.states[sibling.entity_id];
       if (!siblingState) continue;
+      const siblingValue = ["unknown", "unavailable"].includes(siblingState.state)
+        ? null
+        : Number(siblingState.state);
       switch (sibling.translation_key) {
         case "resolution_status":
           row.resolutionStatus = siblingState.state;
@@ -66,6 +72,15 @@ export function buildRows(hass) {
           break;
         case "market_state":
           row.marketState = siblingState.state;
+          break;
+        case "volume_24hr":
+          row.volume24hr = siblingValue;
+          break;
+        case "liquidity":
+          row.liquidity = siblingValue;
+          break;
+        case "previous_close":
+          row.previousClose = siblingValue;
           break;
         default:
           break;

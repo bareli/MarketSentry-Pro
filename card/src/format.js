@@ -27,6 +27,23 @@ export function formatChange(kind, changePct, deltaPp) {
   return `${changePct > 0 ? "+" : ""}${changePct.toFixed(2)}%`;
 }
 
+/** Compact USD, e.g. $1.2M, $340K, $980. @param {number|null} value */
+export function formatCompactUsd(value) {
+  if (value == null || Number.isNaN(value)) return "—";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+/** Short locale date, e.g. "Nov 3, 2026". @param {string|null} isoDate */
+export function formatDate(isoDate) {
+  if (!isoDate) return "—";
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 const MARKET_STATE_LABELS = { pre: "Pre", regular: "Open", post: "After", closed: "Closed" };
 
 /** @param {string|null|undefined} state */

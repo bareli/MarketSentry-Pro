@@ -37,11 +37,14 @@
     border-radius: 12px;
     max-width: 480px;
   }
-  marketsentry-card { display: block; }
+  marketsentry-card, marketsentry-instrument-card { display: block; margin-bottom: 16px; }
 </style>
 </head>
 <body>
 <marketsentry-card id="card"></marketsentry-card>
+<marketsentry-instrument-card id="instrument-outcome"></marketsentry-instrument-card>
+<marketsentry-instrument-card id="instrument-stock"></marketsentry-instrument-card>
+<marketsentry-instrument-card id="instrument-fx"></marketsentry-instrument-card>
 <script type="module">
   import "../../custom_components/marketsentry/www/marketsentry-card.js";
 
@@ -88,6 +91,30 @@
         device_id: "dev2",
         translation_key: "market_state",
       },
+      "sensor.aapl_previous_close": {
+        entity_id: "sensor.aapl_previous_close",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "previous_close",
+      },
+      "sensor.yes_volume_24hr": {
+        entity_id: "sensor.yes_volume_24hr",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "volume_24hr",
+      },
+      "sensor.yes_liquidity": {
+        entity_id: "sensor.yes_liquidity",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "liquidity",
+      },
+      "sensor.yes_end_date": {
+        entity_id: "sensor.yes_end_date",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "end_date",
+      },
       "sensor.eur_ils_rate": {
         entity_id: "sensor.eur_ils_rate",
         platform: "marketsentry",
@@ -120,6 +147,10 @@
         attributes: { kind: "stock", provider: "finnhub", unit_of_measurement: "USD" },
       },
       "sensor.aapl_market_state": { state: "regular", attributes: {} },
+      "sensor.aapl_previous_close": { state: "148.2", attributes: {} },
+      "sensor.yes_volume_24hr": { state: "1234000", attributes: {} },
+      "sensor.yes_liquidity": { state: "340000", attributes: {} },
+      "sensor.yes_end_date": { state: "2026-11-03T18:00:00Z", attributes: {} },
       "sensor.eur_ils_rate": {
         state: "3.9123",
         attributes: {
@@ -138,10 +169,26 @@
   card.setConfig({ type: "custom:marketsentry-card", group_by: "kind" });
   card.hass = mockHass;
 
-  // Signal readiness to Playwright once the card has rendered rows.
+  const instrumentOutcome = document.getElementById("instrument-outcome");
+  instrumentOutcome.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.yes_probability" });
+  instrumentOutcome.hass = mockHass;
+
+  const instrumentStock = document.getElementById("instrument-stock");
+  instrumentStock.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.aapl_price" });
+  instrumentStock.hass = mockHass;
+
+  const instrumentFx = document.getElementById("instrument-fx");
+  instrumentFx.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.eur_ils_rate" });
+  instrumentFx.hass = mockHass;
+
+  // Signal readiness to Playwright once every card has rendered content.
   window.__cardReady = new Promise((resolve) => {
     const check = () => {
-      if (card.shadowRoot && card.shadowRoot.querySelectorAll(".row").length >= 3) {
+      const listReady = card.shadowRoot && card.shadowRoot.querySelectorAll(".row").length >= 3;
+      const instrumentsReady = [instrumentOutcome, instrumentStock, instrumentFx].every(
+        (el) => el.shadowRoot && el.shadowRoot.querySelector(".title")
+      );
+      if (listReady && instrumentsReady) {
         resolve();
       } else {
         requestAnimationFrame(check);

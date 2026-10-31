@@ -34,6 +34,24 @@ function mockHass() {
         device_id: "dev2",
         translation_key: "market_state",
       },
+      "sensor.aapl_previous_close": {
+        entity_id: "sensor.aapl_previous_close",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "previous_close",
+      },
+      "sensor.yes_volume_24hr": {
+        entity_id: "sensor.yes_volume_24hr",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "volume_24hr",
+      },
+      "sensor.yes_liquidity": {
+        entity_id: "sensor.yes_liquidity",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "liquidity",
+      },
       "sensor.unrelated": {
         entity_id: "sensor.unrelated",
         platform: "other_integration",
@@ -57,6 +75,9 @@ function mockHass() {
         attributes: { kind: "stock", provider: "finnhub", unit_of_measurement: "USD" },
       },
       "sensor.aapl_market_state": { state: "regular", attributes: {} },
+      "sensor.aapl_previous_close": { state: "148.2", attributes: {} },
+      "sensor.yes_volume_24hr": { state: "1234000", attributes: {} },
+      "sensor.yes_liquidity": { state: "340000", attributes: {} },
     },
   };
 }
@@ -72,12 +93,15 @@ describe("buildRows", () => {
     expect(outcome.resolutionStatus).toBe("open");
     expect(outcome.closed).toBe(false);
     expect(outcome.url).toBe("https://polymarket.com/market/x");
+    expect(outcome.volume24hr).toBeCloseTo(1_234_000);
+    expect(outcome.liquidity).toBeCloseTo(340_000);
 
     const stock = rows.find((r) => r.kind === "stock");
     expect(stock.name).toBe("AAPL Inc");
     expect(stock.value).toBeCloseTo(150.5);
     expect(stock.marketState).toBe("regular");
     expect(stock.unit).toBe("USD");
+    expect(stock.previousClose).toBeCloseTo(148.2);
   });
 
   it("ignores entities from other integrations", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChange, formatValue, marketStateLabel, statusBadge } from "../src/format.js";
+import { formatChange, formatCompactUsd, formatDate, formatValue, marketStateLabel, statusBadge } from "../src/format.js";
 
 describe("formatValue", () => {
   it("formats outcome as one-decimal percent", () => {
@@ -38,6 +38,36 @@ describe("formatChange", () => {
   it("returns null when the relevant value is missing", () => {
     expect(formatChange("outcome", 5, null)).toBeNull();
     expect(formatChange("stock", null, 5)).toBeNull();
+  });
+});
+
+describe("formatCompactUsd", () => {
+  it("formats millions with one decimal", () => {
+    expect(formatCompactUsd(1_234_000)).toBe("$1.2M");
+  });
+
+  it("formats thousands with one decimal", () => {
+    expect(formatCompactUsd(340_000)).toBe("$340.0K");
+  });
+
+  it("formats sub-thousand values as whole dollars", () => {
+    expect(formatCompactUsd(980)).toBe("$980");
+  });
+
+  it("returns an em dash for null/NaN", () => {
+    expect(formatCompactUsd(null)).toBe("—");
+    expect(formatCompactUsd(Number.NaN)).toBe("—");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats an ISO date as a short locale date", () => {
+    expect(formatDate("2026-11-03T00:00:00Z")).toMatch(/Nov.*3.*2026/);
+  });
+
+  it("returns an em dash for missing/invalid dates", () => {
+    expect(formatDate(null)).toBe("—");
+    expect(formatDate("not-a-date")).toBe("—");
   });
 });
 
