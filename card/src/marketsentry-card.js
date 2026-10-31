@@ -105,6 +105,40 @@ export class MarketSentryCard extends HTMLElement {
   }
 
   _renderRow(row) {
+    return row.kind === "outcome" ? this._renderOutcomeRow(row) : this._renderGenericRow(row);
+  }
+
+  /** Polymarket-style row: title, status badge, then a probability bar with the live % and move. */
+  _renderOutcomeRow(row) {
+    const points = this._history.get(row.entityId) || [];
+    const { deltaPp } = changeFromHistory(points);
+    const changeText = formatChange(row.kind, null, deltaPp);
+    const changeClass = (deltaPp ?? 0) >= 0 ? "positive" : "negative";
+    const badge = statusBadge(row);
+    const href = safeUrl(row.url);
+    const pct = row.value == null ? 0 : Math.min(100, Math.max(0, row.value));
+
+    return `
+      <div class="row" part="row">
+        <div class="row-name" title="${escapeAttr(row.name)}">
+          ${href ? `<a href="${href}" target="_blank" rel="noopener">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}
+        </div>
+        <div class="row-chips">
+          <span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>
+        </div>
+        <div class="prob-line">
+          <div class="prob-bar"><div class="prob-fill" style="width:${pct}%"></div></div>
+          <div class="prob-value">
+            <span class="value" dir="ltr">${escapeHtml(formatValue(row.kind, row.value, row.unit))}</span>
+            ${changeText ? `<span class="change ${changeClass}" dir="ltr">${escapeHtml(changeText)}</span>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /** Stock/FX row: title + value/change up top, chips + sparkline below. */
+  _renderGenericRow(row) {
     const points = this._history.get(row.entityId) || [];
     const { changePct, deltaPp } = changeFromHistory(points);
     const path = buildSparklinePath(points);
@@ -115,10 +149,16 @@ export class MarketSentryCard extends HTMLElement {
 
     return `
       <div class="row" part="row">
-        <div class="row-main">
-          <div class="row-name">
+        <div class="row-top">
+          <div class="row-name" title="${escapeAttr(row.name)}">
             ${href ? `<a href="${href}" target="_blank" rel="noopener">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}
           </div>
+          <div class="row-value">
+            <div class="value" dir="ltr">${escapeHtml(formatValue(row.kind, row.value, row.unit))}</div>
+            ${changeText ? `<div class="change ${changeClass}" dir="ltr">${escapeHtml(changeText)}</div>` : ""}
+          </div>
+        </div>
+        <div class="row-bottom">
           <div class="row-chips">
             ${
               row.kind === "stock"
@@ -130,13 +170,9 @@ export class MarketSentryCard extends HTMLElement {
             ${row.kind === "fx" ? `<span class="chip">${row.source === "boi" || /boi/.test(row.source || "") ? "Bank of Israel" : "Market"}</span>` : ""}
             ${row.kind !== "stock" ? `<span class="badge badge-${slug(badge)}">${escapeHtml(badge)}</span>` : ""}
           </div>
-        </div>
-        <div class="row-spark">
-          ${path ? `<svg viewBox="0 0 80 24" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>` : ""}
-        </div>
-        <div class="row-value">
-          <div class="value" dir="ltr">${escapeHtml(formatValue(row.kind, row.value, row.unit))}</div>
-          ${changeText ? `<div class="change ${changeClass}" dir="ltr">${escapeHtml(changeText)}</div>` : ""}
+          <div class="row-spark">
+            ${path ? `<svg viewBox="0 0 80 24" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>` : ""}
+          </div>
         </div>
       </div>
     `;
@@ -190,23 +226,35 @@ const STYLE = `
   }
   .row {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--divider-color);
   }
   .row:last-child { border-bottom: none; }
-  .row-main { flex: 1 1 auto; min-width: 0; }
+  .row-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
   .row-name {
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 500;
     color: var(--primary-text-color);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
+    line-height: 1.3;
   }
   .row-name a { color: inherit; text-decoration: none; }
   .row-name a:hover { text-decoration: underline; }
-  .row-chips { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .row-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .row-chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip {
     font-size: 0.7rem;
     padding: 2px 8px;
@@ -231,6 +279,32 @@ const STYLE = `
     color: var(--primary-color);
   }
   .row-spark svg { width: 100%; height: 100%; display: block; }
+  .prob-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .prob-bar {
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--secondary-background-color);
+    overflow: hidden;
+  }
+  .prob-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--success-color, #4caf50);
+  }
+  .prob-value {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .prob-value .value { font-size: 1rem; }
+  .prob-value .change { font-size: 0.8rem; }
   .row-value {
     flex: 0 0 auto;
     text-align: end;
