@@ -50,6 +50,9 @@ OPT_CLOSING_SOON_HOURS: Final = "closing_soon_hours"
 OPT_MARKET_OPEN_GAP_PCT: Final = "market_open_gap_pct"
 OPT_EXTENDED_HOURS: Final = "extended_hours"
 OPT_COOLDOWN_MIN: Final = "cooldown_min"
+# Optional quantity held, for position_value/aggregate-total sensors
+# (ENH-011). None/unset by default so pure-watchlist use is unaffected.
+OPT_QUANTITY: Final = "quantity"
 
 DEFAULT_COOLDOWN_MIN: Final = 15
 DEFAULT_LARGE_TRADE_USD: Final = 10_000.0
@@ -71,6 +74,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_VOLUME_SPIKE_PCT: DEFAULT_VOLUME_SPIKE_PCT,
             OPT_CLOSING_SOON_HOURS: DEFAULT_CLOSING_SOON_HOURS,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
+            OPT_QUANTITY: None,
         }
     if kind == "stock":
         return {
@@ -83,6 +87,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_MARKET_OPEN_GAP_PCT: DEFAULT_MARKET_OPEN_GAP_PCT,
             OPT_EXTENDED_HOURS: False,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
+            OPT_QUANTITY: None,
         }
     if kind == "crypto":
         return {
@@ -92,6 +97,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_MOVE_WINDOW_MIN: 60,
             OPT_DAILY_CHANGE_PCT: DEFAULT_DAILY_CHANGE_PCT,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
+            OPT_QUANTITY: None,
         }
     # fx
     return {
@@ -101,6 +107,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
         OPT_MOVE_WINDOW_MIN: 24 * 60,
         OPT_DAILY_CHANGE_PCT: DEFAULT_DAILY_CHANGE_PCT,
         OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
+        OPT_QUANTITY: None,
     }
 
 

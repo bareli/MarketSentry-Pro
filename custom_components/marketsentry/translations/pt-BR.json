@@ -70,11 +70,13 @@
             "closing_soon_hours": "Limite \"fecha em breve\" (horas)",
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
-            "cooldown_min": "Tempo de espera por tipo de evento (minutos)"
+            "cooldown_min": "Tempo de espera por tipo de evento (minutos)",
+            "quantity": "Quantidade possuída"
           },
           "data_description": {
             "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
-            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento."
+            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento.",
+            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Limite \"fecha em breve\" (horas)",
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
-            "cooldown_min": "Tempo de espera por tipo de evento (minutos)"
+            "cooldown_min": "Tempo de espera por tipo de evento (minutos)",
+            "quantity": "Quantidade possuída"
           },
           "data_description": {
             "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
-            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento."
+            "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento.",
+            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Fechado"
         }
       },
-      "rate": { "name": "Taxa" }
+      "rate": { "name": "Taxa" },
+      "outcomes_total": { "name": "Total de resultados" },
+      "stocks_total": { "name": "Total de ações" },
+      "crypto_total": { "name": "Total de criptomoedas" },
+      "fx_total": { "name": "Total de moedas" }
     },
     "binary_sensor": {
       "closed": { "name": "Fechado" },

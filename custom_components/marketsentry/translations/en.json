@@ -70,11 +70,13 @@
             "closing_soon_hours": "Closing soon threshold (hours)",
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
-            "cooldown_min": "Cooldown per event type (minutes)"
+            "cooldown_min": "Cooldown per event type (minutes)",
+            "quantity": "Quantity held"
           },
           "data_description": {
             "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
-            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value."
+            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value.",
+            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Closing soon threshold (hours)",
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
-            "cooldown_min": "Cooldown per event type (minutes)"
+            "cooldown_min": "Cooldown per event type (minutes)",
+            "quantity": "Quantity held"
           },
           "data_description": {
             "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
-            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value."
+            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value.",
+            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Closed"
         }
       },
-      "rate": { "name": "Rate" }
+      "rate": { "name": "Rate" },
+      "outcomes_total": { "name": "Outcomes total" },
+      "stocks_total": { "name": "Stocks total" },
+      "crypto_total": { "name": "Crypto total" },
+      "fx_total": { "name": "FX total" }
     },
     "binary_sensor": {
       "closed": { "name": "Closed" },

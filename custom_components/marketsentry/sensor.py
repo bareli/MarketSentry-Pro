@@ -18,6 +18,7 @@ from .const import (
     MARKET_STATE_POST,
     MARKET_STATE_PRE,
     MARKET_STATE_REGULAR,
+    OPT_QUANTITY,
     STATUS_CLOSED,
     STATUS_DISPUTED,
     STATUS_OPEN,
@@ -25,9 +26,38 @@ from .const import (
     STATUS_RESOLVED,
 )
 from .coordinator import PolymarketMetadataCoordinator, ProviderSnapshotCoordinator
-from .entity import InstrumentEntity, card_attributes, instrument_device_info
+from .entity import (
+    InstrumentEntity,
+    card_attributes,
+    instrument_device_info,
+    provider_connection_device_info,
+)
 from .market_calendar import market_state as calc_market_state
-from .providers.base import Quote, Trade
+from .providers.base import InstrumentRef, Quote, Trade
+
+
+def _position_value(ref: InstrumentRef, quantity: float | None, price: float | None) -> float | None:
+    """quantity x the same current-price value this instrument's primary
+    sensor already exposes as its native state (ENH-011): percent-scaled
+    for `outcome` so it matches `ProbabilitySensor.native_value`, the raw
+    quote price otherwise. `None` when quantity isn't set or there's no
+    live price yet - never 0, so an untracked position reads "unknown"
+    rather than a misleading zero."""
+    if quantity is None or price is None:
+        return None
+    native_price = price * 100 if ref.kind == "outcome" else price
+    return quantity * native_price
+
+
+# Per-kind translated name for the entry-level position-value total
+# sensors below. Per D-017/D-028: per-kind subtotals only, no cross-kind
+# normalization.
+_POSITION_VALUE_TOTAL_TRANSLATION_KEY = {
+    "outcome": "outcomes_total",
+    "stock": "stocks_total",
+    "crypto": "crypto_total",
+    "fx": "fx_total",
+}
 
 
 async def async_setup_entry(
@@ -71,6 +101,24 @@ async def async_setup_entry(
 
         async_add_entities(entities, config_subentry_id=subentry_id)
 
+    # Entry-level aggregate totals (ENH-011): one per (kind, unit) actually
+    # present among this entry's instruments, not per subentry - grouped by
+    # unit as well as kind so a provider account that ever mixes quote
+    # currencies within one kind (e.g. an fx entry with both EUR/ILS and
+    # EUR/USD pairs) never silently sums two currencies together. This
+    # naturally tracks the entry's reload-on-subentry-change: added/removed
+    # as whole groups appear/disappear, not per quantity edit.
+    position_value_groups: dict[tuple[str, str], list[InstrumentTracker]] = {}
+    for tracker in runtime.trackers.values():
+        position_value_groups.setdefault((tracker.ref.kind, tracker.ref.unit), []).append(tracker)
+
+    aggregate_entities = [
+        PositionValueTotalSensor(entry, runtime.provider_name, kind, unit, group)
+        for (kind, unit), group in position_value_groups.items()
+    ]
+    if aggregate_entities:
+        async_add_entities(aggregate_entities)
+
 
 class ProbabilitySensor(InstrumentEntity, SensorEntity):
     """Live probability (midpoint) for one Polymarket outcome, in percent."""
@@ -98,6 +146,9 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
         if quote.bid is not None and quote.ask is not None:
             spread = round((quote.ask - quote.bid) * 100, 2)
         move = self._tracker.detectors.move.last_delta
+        position_value = _position_value(
+            self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), quote.price
+        )
         return {
             **card_attributes(self._tracker.ref),
             "best_bid": quote.bid,
@@ -108,6 +159,8 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
             # uses to decide whether to fire `price_move` - not a card-side
             # approximation from the sparkline buffer (ENH-009).
             "change_pp": round(move, 1) if move is not None else None,
+            # quantity x price (ENH-011), None until a quantity is set.
+            "position_value": round(position_value, 2) if position_value is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -220,12 +273,17 @@ class PriceSensor(InstrumentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         daily_change = self._tracker.detectors.daily_change
         change_pct = daily_change.last_change_pct if daily_change is not None else None
+        position_value = _position_value(
+            self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), self._tracker.last_quote.price
+        )
         return {
             **card_attributes(self._tracker.ref),
             # The exact windowed change (%) DailyChangeDetector uses to
             # decide whether to fire `daily_change` - not a card-side
             # approximation from the sparkline buffer (ENH-009).
             "change_pct": round(change_pct, 2) if change_pct is not None else None,
+            # quantity x price (ENH-011), None until a quantity is set.
+            "position_value": round(position_value, 2) if position_value is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -304,6 +362,9 @@ class RateSensor(InstrumentEntity, SensorEntity):
         quote = self._tracker.last_quote
         daily_change = self._tracker.detectors.daily_change
         change_pct = daily_change.last_change_pct if daily_change is not None else None
+        position_value = _position_value(
+            self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), quote.price
+        )
         return {
             **card_attributes(self._tracker.ref),
             "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
@@ -312,6 +373,8 @@ class RateSensor(InstrumentEntity, SensorEntity):
             # decide whether to fire `daily_change` - not a card-side
             # approximation from the sparkline buffer (ENH-009).
             "change_pct": round(change_pct, 2) if change_pct is not None else None,
+            # quantity x price (ENH-011), None until a quantity is set.
+            "position_value": round(position_value, 2) if position_value is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -439,3 +502,63 @@ class WinningOutcomeSensor(_MetadataSensor):
             if outcome.price is not None and outcome.price >= 0.99:
                 return outcome.name
         return None
+
+
+class PositionValueTotalSensor(SensorEntity):
+    """Entry-level: sum of `position_value` across this provider account's
+    instruments of one kind (and quote unit) that have a quantity set
+    (ENH-011). Not tied to any one instrument's device - it aggregates
+    across all of them, so it lives on the provider's own connection
+    device, like `StreamConnectedBinarySensor`.
+
+    Grouped by (kind, unit) rather than kind alone: stock/crypto/outcome
+    each only ever produce one unit for their kind today (USD/USD/%), so
+    this is invisible for them, but an fx provider account could mix
+    quote currencies (e.g. EUR/ILS and EUR/USD) - grouping by unit too
+    means that case gets two totals instead of one sensor silently
+    summing two currencies, which per-kind subtotals (D-017/D-028) never
+    intended to do.
+
+    Added/removed per whole (kind, unit) group, which already happens
+    for free via the entry reload that runs on every subentry add/
+    remove/reconfigure (see `__init__.py`'s module docstring) - not
+    recreated just because one instrument's quantity is edited.
+
+    `native_value` is `None` - not 0 - until at least one instrument in
+    the group has both a quantity set and a live price, so a group with
+    no quantities set yet reads "unknown" rather than a misleading zero.
+    """
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        entry: MarketSentryConfigEntry,
+        provider_name: str,
+        kind: str,
+        unit: str,
+        trackers: list[InstrumentTracker],
+    ) -> None:
+        self._trackers = trackers
+        self._attr_unique_id = f"{entry.entry_id}_position_value_{kind}_{unit or 'none'}"
+        self._attr_device_info = provider_connection_device_info(entry, provider_name)
+        self._attr_translation_key = _POSITION_VALUE_TOTAL_TRANSLATION_KEY.get(kind, f"{kind}_total")
+        if unit and unit != "%":
+            self._attr_device_class = SensorDeviceClass.MONETARY
+        if unit:
+            self._attr_native_unit_of_measurement = unit
+
+    @property
+    def native_value(self) -> float | None:
+        values = [
+            value
+            for tracker in self._trackers
+            if (
+                value := _position_value(
+                    tracker.ref, tracker.options.get(OPT_QUANTITY), tracker.last_quote.price
+                )
+            )
+            is not None
+        ]
+        return round(sum(values), 2) if values else None

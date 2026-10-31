@@ -70,11 +70,13 @@
             "closing_soon_hours": "Schwellenwert \"Schließt bald\" (Stunden)",
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
-            "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)"
+            "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)",
+            "quantity": "Gehaltene Menge"
           },
           "data_description": {
             "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
-            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst."
+            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst.",
+            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen."
           }
         },
         "reconfigure": {
@@ -90,11 +92,13 @@
             "closing_soon_hours": "Schwellenwert \"Schließt bald\" (Stunden)",
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
-            "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)"
+            "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)",
+            "quantity": "Gehaltene Menge"
           },
           "data_description": {
             "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
-            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst."
+            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst.",
+            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen."
           }
         }
       },
@@ -146,7 +150,11 @@
           "closed": "Geschlossen"
         }
       },
-      "rate": { "name": "Kurs" }
+      "rate": { "name": "Kurs" },
+      "outcomes_total": { "name": "Ergebnisse gesamt" },
+      "stocks_total": { "name": "Aktien gesamt" },
+      "crypto_total": { "name": "Krypto gesamt" },
+      "fx_total": { "name": "Devisen gesamt" }
     },
     "binary_sensor": {
       "closed": { "name": "Geschlossen" },

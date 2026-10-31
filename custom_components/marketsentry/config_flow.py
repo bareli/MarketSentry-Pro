@@ -50,6 +50,7 @@ from .const import (
     OPT_MARKET_OPEN_GAP_PCT,
     OPT_MOVE_DELTA,
     OPT_MOVE_WINDOW_MIN,
+    OPT_QUANTITY,
     OPT_THRESHOLDS,
     OPT_VOLUME_SPIKE_PCT,
     PROVIDER_KEYS,
@@ -83,6 +84,15 @@ def _parse_thresholds(raw: str) -> list[float]:
     return [float(t.strip()) for t in raw.split(",") if t.strip()]
 
 
+def _quantity_to_str(quantity: float | None) -> str:
+    return "" if quantity is None else str(quantity)
+
+
+def _parse_quantity(raw: str) -> float | None:
+    raw = raw.strip()
+    return float(raw) if raw else None
+
+
 def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
     fields: dict[Any, Any] = {
         vol.Optional(OPT_THRESHOLDS, default=_thresholds_to_str(defaults.get(OPT_THRESHOLDS, []))): str,
@@ -90,6 +100,7 @@ def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
         vol.Optional(OPT_MOVE_DELTA, default=defaults.get(OPT_MOVE_DELTA, 5.0)): vol.Coerce(float),
         vol.Optional(OPT_MOVE_WINDOW_MIN, default=defaults.get(OPT_MOVE_WINDOW_MIN, 60)): vol.Coerce(int),
         vol.Optional(OPT_COOLDOWN_MIN, default=defaults.get(OPT_COOLDOWN_MIN, 15)): vol.Coerce(int),
+        vol.Optional(OPT_QUANTITY, default=_quantity_to_str(defaults.get(OPT_QUANTITY))): str,
     }
     if kind in ("stock", "fx", "crypto"):
         fields[
@@ -147,6 +158,7 @@ def _notify_dashboard_strategy(hass: HomeAssistant) -> None:
 def _parse_options_form(kind: str, user_input: dict[str, Any]) -> dict[str, Any]:
     opts = dict(default_options_for_kind(kind))
     opts[OPT_THRESHOLDS] = _parse_thresholds(user_input.get(OPT_THRESHOLDS, ""))
+    opts[OPT_QUANTITY] = _parse_quantity(user_input.get(OPT_QUANTITY, ""))
     for key in (
         OPT_HYSTERESIS,
         OPT_MOVE_DELTA,
