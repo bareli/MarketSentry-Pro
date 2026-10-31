@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Anbieterkonto hinzufügen",
-        "description": "Wähle, welchen Marktdatenanbieter dieses Konto verfolgt. Zugangsdaten (falls nötig) werden einmal eingegeben; Instrumente werden danach hinzugefügt, ohne sie erneut einzugeben.",
+        "description": "Wähle, welchen Marktdatenanbieter dieses Konto verfolgt. Zugangsdaten (falls nötig) werden einmal eingegeben; Instrumente werden danach hinzugefügt, ohne sie erneut einzugeben. Polymarket, CoinGecko und Exchange rates benötigen kein Konto oder API-Schlüssel – wähle zuerst einen davon, wenn du es einfach in Aktion sehen willst.",
         "data": {
           "provider": "Anbieter"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Ungültige Zugangsdaten.",
+      "invalid_auth_finnhub": "Ungültiger Finnhub-API-Schlüssel. Prüfe, ob du den vollständigen Schlüssel ohne zusätzliche Leerzeichen von finnhub.io kopiert hast.",
+      "invalid_auth_alpaca": "Ungültige Alpaca-Schlüssel-ID oder geheimer Schlüssel. Prüfe, ob beide vollständig von der API-Schlüsselseite deines Alpaca-Kontos kopiert wurden.",
       "cannot_connect": "Anbieter nicht erreichbar. Später erneut versuchen."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
             "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)"
+          },
+          "data_description": {
+            "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
+            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
             "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)"
+          },
+          "data_description": {
+            "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
+            "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst."
           }
         }
       },

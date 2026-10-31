@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Aggiungi un account fornitore",
-        "description": "Scegli quale fornitore di dati di mercato segue questo account. Le credenziali (se necessarie) vengono inserite una volta sola; gli strumenti vengono aggiunti in seguito senza doverle reinserire.",
+        "description": "Scegli quale fornitore di dati di mercato segue questo account. Le credenziali (se necessarie) vengono inserite una volta sola; gli strumenti vengono aggiunti in seguito senza doverle reinserire. Polymarket, CoinGecko e Exchange rates non richiedono account o chiave API: scegline uno se vuoi solo vederlo funzionare.",
         "data": {
           "provider": "Fornitore"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Credenziali non valide.",
+      "invalid_auth_finnhub": "Chiave API Finnhub non valida. Verifica di aver copiato la chiave completa da finnhub.io, senza spazi extra.",
+      "invalid_auth_alpaca": "ID chiave o chiave segreta Alpaca non valida. Verifica che entrambe siano state copiate per intero dalla pagina delle chiavi API del tuo account Alpaca.",
       "cannot_connect": "Impossibile contattare il fornitore. Riprova più tardi."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Soglia gap di apertura (%)",
             "extended_hours": "Segui orario esteso",
             "cooldown_min": "Tempo di attesa per tipo di evento (minuti)"
+          },
+          "data_description": {
+            "hysteresis": "Quanto il valore deve tornare indietro prima che la stessa soglia possa attivarsi di nuovo, nella stessa unità del valore di questo strumento.",
+            "move_delta": "Variazione minima all'interno della finestra di movimento che conta come movimento rapido, nella stessa unità del valore di questo strumento."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Soglia gap di apertura (%)",
             "extended_hours": "Segui orario esteso",
             "cooldown_min": "Tempo di attesa per tipo di evento (minuti)"
+          },
+          "data_description": {
+            "hysteresis": "Quanto il valore deve tornare indietro prima che la stessa soglia possa attivarsi di nuovo, nella stessa unità del valore di questo strumento.",
+            "move_delta": "Variazione minima all'interno della finestra di movimento che conta come movimento rapido, nella stessa unità del valore di questo strumento."
           }
         }
       },

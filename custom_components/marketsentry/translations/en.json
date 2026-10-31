@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Add a provider account",
-        "description": "Choose which market data provider this account tracks. Credentials (if needed) are entered once; instruments are added afterward without re-entering them.",
+        "description": "Choose which market data provider this account tracks. Credentials (if needed) are entered once; instruments are added afterward without re-entering them. Polymarket, CoinGecko and Exchange rates need no account or API key - pick one of those first if you just want to see it working.",
         "data": {
           "provider": "Provider"
         }
@@ -26,7 +26,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Invalid credentials.",
+      "invalid_auth_finnhub": "Invalid Finnhub API key. Check you copied the whole key from finnhub.io with no extra spaces.",
+      "invalid_auth_alpaca": "Invalid Alpaca key ID or secret key. Check both were copied in full from your Alpaca account's API keys page.",
       "cannot_connect": "Could not reach the provider. Try again later."
     },
     "abort": {
@@ -70,6 +71,10 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)"
+          },
+          "data_description": {
+            "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
+            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value."
           }
         },
         "reconfigure": {
@@ -86,6 +91,10 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)"
+          },
+          "data_description": {
+            "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
+            "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value."
           }
         }
       },
