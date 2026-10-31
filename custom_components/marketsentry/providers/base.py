@@ -77,6 +77,27 @@ OnQuote = Callable[[str, Quote], Awaitable[None]]
 OnTrade = Callable[[str, Trade], Awaitable[None]]
 OnProviderEvent = Callable[[str, ProviderEvent], Awaitable[None]]
 
+StreamPhase = Literal["connecting", "connected", "reconnecting", "backing_off", "stopped"]
+
+
+@dataclass(slots=True, frozen=True)
+class StreamStatus:
+    """A point-in-time report of a provider's `stream()` connection phase.
+
+    `reconnect_count` is the number of reconnect attempts made so far on
+    this stream task (0 on the very first connection attempt); it does not
+    reset on a successful connect, so it reads as a running total of how
+    many times this stream has had to recover since it started. "stopped"
+    is used only by the coordinator layer once the stream task itself ends
+    (cancelled on unload, or an unrecoverable bug) - providers never report it.
+    """
+
+    phase: StreamPhase
+    reconnect_count: int = 0
+
+
+OnStreamStatus = Callable[[StreamStatus], None]
+
 
 class CannotConnect(Exception):
     """Raised when a provider cannot be reached."""
@@ -120,9 +141,13 @@ class Provider(ABC):
         on_quote: OnQuote,
         on_trade: OnTrade,
         on_event: OnProviderEvent,
+        on_status: OnStreamStatus | None = None,
     ) -> None:
         """Run a streaming connection for the given refs until cancelled.
 
         Only implemented by providers with supports_streaming = True.
+        `on_status`, if given, is called synchronously with a `StreamStatus`
+        on every connection-phase transition (connecting/connected/
+        reconnecting/backing_off) - see ENH-007.
         """
         raise NotImplementedError(f"{self.key} does not support streaming")

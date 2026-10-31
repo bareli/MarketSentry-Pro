@@ -48,10 +48,12 @@ from .base import (
     InvalidAuth,
     OnProviderEvent,
     OnQuote,
+    OnStreamStatus,
     OnTrade,
     PricePoint,
     Provider,
     Quote,
+    StreamStatus,
     Trade,
 )
 
@@ -213,6 +215,7 @@ class FinnhubProvider(Provider):
         on_quote: OnQuote,
         on_trade: OnTrade,
         on_event: OnProviderEvent,
+        on_status: OnStreamStatus | None = None,
     ) -> None:
         if len(refs) > FREE_TIER_WS_SYMBOL_LIMIT:
             _LOGGER.warning(
@@ -223,9 +226,17 @@ class FinnhubProvider(Provider):
 
         symbols = [ref.id for ref in refs]
         attempt = 0
+        reconnect_count = 0
         while True:
+            if on_status is not None:
+                on_status(
+                    StreamStatus(
+                        phase="connecting" if reconnect_count == 0 else "reconnecting",
+                        reconnect_count=reconnect_count,
+                    )
+                )
             try:
-                await self._connect_and_listen(symbols, on_quote, on_trade)
+                await self._connect_and_listen(symbols, on_quote, on_trade, on_status, reconnect_count)
                 attempt = 0
             except asyncio.CancelledError:
                 raise
@@ -236,12 +247,24 @@ class FinnhubProvider(Provider):
                 _LOGGER.debug("Finnhub WS error: %s", type(err).__name__)
 
             attempt += 1
+            reconnect_count += 1
             delay = min(_RECONNECT_MIN_SEC * (2 ** (attempt - 1)), _RECONNECT_MAX_SEC)
+            if on_status is not None:
+                on_status(StreamStatus(phase="backing_off", reconnect_count=reconnect_count))
             await asyncio.sleep(delay + random.uniform(0, delay * 0.25))
 
-    async def _connect_and_listen(self, symbols: list[str], on_quote: OnQuote, on_trade: OnTrade) -> None:
+    async def _connect_and_listen(
+        self,
+        symbols: list[str],
+        on_quote: OnQuote,
+        on_trade: OnTrade,
+        on_status: OnStreamStatus | None = None,
+        reconnect_count: int = 0,
+    ) -> None:
         url = f"{FINNHUB_WS_URL}?token={self._api_key}"
         async with self._session.ws_connect(url) as ws:
+            if on_status is not None:
+                on_status(StreamStatus(phase="connected", reconnect_count=reconnect_count))
             for symbol in symbols:
                 await ws.send_str(json.dumps({"type": "subscribe", "symbol": symbol}))
 

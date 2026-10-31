@@ -32,11 +32,13 @@ from .base import (
     InstrumentRef,
     OnProviderEvent,
     OnQuote,
+    OnStreamStatus,
     OnTrade,
     PricePoint,
     Provider,
     ProviderEvent,
     Quote,
+    StreamStatus,
     Trade,
 )
 
@@ -172,11 +174,39 @@ class PolymarketProvider(Provider):
         on_quote: OnQuote,
         on_trade: OnTrade,
         on_event: OnProviderEvent,
+        on_status: OnStreamStatus | None = None,
     ) -> None:
+        # ENH-007's "relevant files" named only finnhub.py/alpaca.py as
+        # having a real stream() reconnect loop, but PolymarketWsManager
+        # (ws.py) has its own exponential-backoff reconnect loop too, with
+        # an `on_connection_state_change(bool)` hook already built for
+        # exactly this - just never wired up. Wiring it here instead of
+        # stubbing a fake always-"connected" status, so the binary sensor
+        # keeps reporting Polymarket's real reconnects, not a regression
+        # back to the old task-alive proxy for this provider.
+        reconnect_count = 0
+        connected_once = False
+
+        def on_ws_connection_state_change(connected: bool) -> None:
+            nonlocal reconnect_count, connected_once
+            if on_status is None:
+                return
+            if connected:
+                if connected_once:
+                    reconnect_count += 1
+                connected_once = True
+                on_status(StreamStatus(phase="connected", reconnect_count=reconnect_count))
+            else:
+                on_status(StreamStatus(phase="reconnecting", reconnect_count=reconnect_count))
+
         async def handle_message(message: dict[str, Any]) -> None:
             await _dispatch_ws_message(message, on_quote, on_trade, on_event)
 
-        ws_manager = PolymarketWsManager(self._session, handle_message)
+        ws_manager = PolymarketWsManager(
+            self._session, handle_message, on_ws_connection_state_change
+        )
+        if on_status is not None:
+            on_status(StreamStatus(phase="connecting"))
         await ws_manager.subscribe([ref.id for ref in refs])
         await ws_manager.start()
         try:

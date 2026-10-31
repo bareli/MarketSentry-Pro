@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 from aiohttp import web
 
 import custom_components.marketsentry.providers.finnhub as finnhub_module
-from custom_components.marketsentry.providers.base import InstrumentRef, InvalidAuth
+from custom_components.marketsentry.providers.base import (
+    CannotConnect,
+    InstrumentRef,
+    InvalidAuth,
+    StreamStatus,
+)
 from custom_components.marketsentry.providers.finnhub import FinnhubProvider
 
 
@@ -161,3 +167,78 @@ async def test_connect_and_listen_dispatches_trade_messages(aiohttp_client) -> N
 
     assert trades[0][0] == "AAPL"
     assert quotes[0][0] == "AAPL"
+
+
+async def test_connect_and_listen_reports_connected_status(aiohttp_client) -> None:
+    """ENH-007: once the WS handshake succeeds, `_connect_and_listen` must
+    report a "connected" StreamStatus (with the reconnect_count it was
+    given) via `on_status`, so the coordinator/binary sensor reflect a real
+    connection instead of inferring it from "the task hasn't died"."""
+
+    async def ws_handler(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        await ws.close()
+        return ws
+
+    app = web.Application()
+    app.router.add_get("/", ws_handler)
+    client = await aiohttp_client(app)
+    finnhub_module.FINNHUB_WS_URL = str(client.make_url("/")).replace("http://", "ws://").rstrip("/")
+
+    provider = FinnhubProvider(client.session, api_key="test-key")
+    statuses: list[StreamStatus] = []
+
+    async def on_quote(symbol: str, quote: object) -> None:
+        pass
+
+    async def on_trade(symbol: str, trade: object) -> None:
+        pass
+
+    await provider._connect_and_listen(["AAPL"], on_quote, on_trade, statuses.append, reconnect_count=3)
+
+    assert statuses == [StreamStatus(phase="connected", reconnect_count=3)]
+
+
+async def test_stream_reports_reconnect_phases_and_increments_reconnect_count(monkeypatch) -> None:
+    """ENH-007 regression: the reconnect/backoff loop in `stream()` must
+    report "connecting" on the very first attempt, then "backing_off"
+    immediately after a failed attempt (before sleeping), then
+    "reconnecting" on the next attempt - and `reconnect_count` must keep
+    rising, not reset, across that cycle (unlike the backoff delay, which
+    does reset on the next successful connect)."""
+
+    provider = FinnhubProvider(session=None, api_key="test-key")  # type: ignore[arg-type]
+    calls = 0
+
+    async def fake_connect_and_listen(symbols, on_quote, on_trade, on_status=None, reconnect_count=0):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise CannotConnect("boom")
+        raise asyncio.CancelledError
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(provider, "_connect_and_listen", fake_connect_and_listen)
+    monkeypatch.setattr(finnhub_module.asyncio, "sleep", lambda *_a, **_k: real_sleep(0))
+
+    ref = InstrumentRef(provider="finnhub", id="AAPL", symbol="AAPL", name="Apple", kind="stock", unit="USD")
+    statuses: list[StreamStatus] = []
+
+    async def on_quote(symbol: str, quote: object) -> None:
+        pass
+
+    async def on_trade(symbol: str, trade: object) -> None:
+        pass
+
+    async def on_event(symbol: str, event: object) -> None:
+        pass
+
+    with pytest.raises(asyncio.CancelledError):
+        await provider.stream([ref], on_quote, on_trade, on_event, statuses.append)
+
+    assert statuses == [
+        StreamStatus(phase="connecting", reconnect_count=0),
+        StreamStatus(phase="backing_off", reconnect_count=1),
+        StreamStatus(phase="reconnecting", reconnect_count=1),
+    ]

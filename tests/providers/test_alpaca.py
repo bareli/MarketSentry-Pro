@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -9,7 +10,12 @@ from aiohttp import web
 
 import custom_components.marketsentry.providers.alpaca as alpaca_module
 from custom_components.marketsentry.providers.alpaca import AlpacaProvider
-from custom_components.marketsentry.providers.base import CannotConnect, InstrumentRef, InvalidAuth
+from custom_components.marketsentry.providers.base import (
+    CannotConnect,
+    InstrumentRef,
+    InvalidAuth,
+    StreamStatus,
+)
 
 
 async def _provider_for(aiohttp_client, app: web.Application) -> AlpacaProvider:
@@ -203,3 +209,116 @@ async def test_connect_and_listen_auths_then_dispatches_quote(aiohttp_client) ->
     assert any(r.get("action") == "auth" for r in received)
     assert quotes[0][0] == "AAPL"
     assert quotes[0][1].price == 150.0
+
+
+async def test_connect_and_listen_reports_connected_status_after_auth(aiohttp_client) -> None:
+    """ENH-007: "connected" must only be reported once the WS auth handshake
+    actually succeeds (not merely once the socket opens), with the
+    reconnect_count it was given passed through unchanged."""
+
+    async def ws_handler(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                payload = json.loads(msg.data)
+                if payload.get("action") == "auth":
+                    await ws.send_str(json.dumps([{"T": "success", "msg": "authenticated"}]))
+                elif payload.get("action") == "subscribe":
+                    await ws.close()
+        return ws
+
+    app = web.Application()
+    app.router.add_get("/v2/iex", ws_handler)
+    client = await aiohttp_client(app)
+    base = str(client.make_url("/v2/_")).replace("http://", "ws://")[:-1]
+    alpaca_module.ALPACA_STREAM_URL_TEMPLATE = base + "{feed}"
+
+    provider = AlpacaProvider(client.session, key_id="key", secret_key="secret", feed="iex")
+    statuses: list[StreamStatus] = []
+
+    async def on_quote(symbol: str, quote: object) -> None:
+        pass
+
+    async def on_trade(symbol: str, trade: object) -> None:
+        pass
+
+    await provider._connect_and_listen(["AAPL"], on_quote, on_trade, statuses.append, reconnect_count=2)
+
+    assert statuses == [StreamStatus(phase="connected", reconnect_count=2)]
+
+
+async def test_connect_and_listen_reports_no_status_when_auth_fails(aiohttp_client) -> None:
+    """ENH-007: a failed WS auth must raise InvalidAuth (existing behavior,
+    unchanged) and must NOT report "connected" - the finnhub/alpaca
+    stream() loop treats an exception from `_connect_and_listen` as a
+    failed attempt and moves straight to backing_off/reconnecting."""
+
+    async def ws_handler(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        await ws.send_str(json.dumps([{"T": "error", "msg": "auth failed"}]))
+        await ws.close()
+        return ws
+
+    app = web.Application()
+    app.router.add_get("/v2/iex", ws_handler)
+    client = await aiohttp_client(app)
+    base = str(client.make_url("/v2/_")).replace("http://", "ws://")[:-1]
+    alpaca_module.ALPACA_STREAM_URL_TEMPLATE = base + "{feed}"
+
+    provider = AlpacaProvider(client.session, key_id="key", secret_key="secret", feed="iex")
+    statuses: list[StreamStatus] = []
+
+    async def on_quote(symbol: str, quote: object) -> None:
+        pass
+
+    async def on_trade(symbol: str, trade: object) -> None:
+        pass
+
+    with pytest.raises(InvalidAuth):
+        await provider._connect_and_listen(["AAPL"], on_quote, on_trade, statuses.append)
+
+    assert statuses == []
+
+
+async def test_stream_reports_reconnect_phases_and_increments_reconnect_count(monkeypatch) -> None:
+    """ENH-007 regression: same phase/reconnect_count contract as Finnhub's
+    stream() loop - "connecting" first, then "backing_off" right after a
+    failed attempt (before sleeping), then "reconnecting" on retry, with
+    reconnect_count rising across the cycle."""
+
+    provider = AlpacaProvider(session=None, key_id="key", secret_key="secret")  # type: ignore[arg-type]
+    calls = 0
+
+    async def fake_connect_and_listen(symbols, on_quote, on_trade, on_status=None, reconnect_count=0):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise CannotConnect("boom")
+        raise asyncio.CancelledError
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(provider, "_connect_and_listen", fake_connect_and_listen)
+    monkeypatch.setattr(alpaca_module.asyncio, "sleep", lambda *_a, **_k: real_sleep(0))
+
+    ref = InstrumentRef(provider="alpaca", id="AAPL", symbol="AAPL", name="AAPL", kind="stock", unit="USD")
+    statuses: list[StreamStatus] = []
+
+    async def on_quote(symbol: str, quote: object) -> None:
+        pass
+
+    async def on_trade(symbol: str, trade: object) -> None:
+        pass
+
+    async def on_event(symbol: str, event: object) -> None:
+        pass
+
+    with pytest.raises(asyncio.CancelledError):
+        await provider.stream([ref], on_quote, on_trade, on_event, statuses.append)
+
+    assert statuses == [
+        StreamStatus(phase="connecting", reconnect_count=0),
+        StreamStatus(phase="backing_off", reconnect_count=1),
+        StreamStatus(phase="reconnecting", reconnect_count=1),
+    ]

@@ -5,10 +5,13 @@ dispatch table.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from aiohttp import web
 
 import custom_components.marketsentry.api as api_module
+import custom_components.marketsentry.providers.polymarket as polymarket_module
 from custom_components.marketsentry.models import Market
 from custom_components.marketsentry.providers.base import InstrumentRef, ProviderEvent, Quote, Trade
 from custom_components.marketsentry.providers.polymarket import (
@@ -17,6 +20,41 @@ from custom_components.marketsentry.providers.polymarket import (
     _market_to_refs,
 )
 from tests.conftest import GAMMA_MARKET_FIXTURE
+
+
+async def _noop_on_quote(ref_id: str, quote: Quote) -> None:
+    pass
+
+
+async def _noop_on_trade(ref_id: str, trade) -> None:  # noqa: ANN001
+    pass
+
+
+async def _noop_on_event(ref_id: str, event: ProviderEvent) -> None:
+    pass
+
+
+class _FakeWsManager:
+    """Stands in for PolymarketWsManager: captures the connection-state
+    callback so a test can drive it directly instead of a real WebSocket.
+    Records the most recently constructed instance on the class itself so
+    the test can reach it without threading extra plumbing through stream()."""
+
+    last_instance: _FakeWsManager | None = None
+
+    def __init__(self, session, on_message, on_connection_state_change=None, url=None) -> None:  # noqa: ANN001
+        self.on_connection_state_change = on_connection_state_change
+        self.subscribed: list[str] = []
+        _FakeWsManager.last_instance = self
+
+    async def subscribe(self, token_ids: list[str]) -> None:
+        self.subscribed.extend(token_ids)
+
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
 
 
 def test_market_to_refs_yields_one_ref_per_outcome() -> None:
@@ -70,6 +108,41 @@ async def test_fetch_snapshot_uses_order_book(aiohttp_client) -> None:
     assert quotes["111"].bid == 0.58
     assert quotes["111"].ask == 0.60
     assert quotes["111"].price == pytest.approx(0.59)
+
+
+async def test_stream_reports_connect_and_reconnect_via_on_status(aiohttp_client, monkeypatch) -> None:
+    """ENH-007 regression: PolymarketProvider.stream() must keep reporting
+    real connect/reconnect phases through on_status, not regress to a
+    permanently-"connecting"/never-connected binary sensor for a provider
+    that does stream over a real WS connection."""
+    monkeypatch.setattr(polymarket_module, "PolymarketWsManager", _FakeWsManager)
+
+    app = web.Application()
+    client = await aiohttp_client(app)
+    provider = PolymarketProvider(client.session)
+    ref = InstrumentRef(provider="polymarket", id="111", symbol="Yes", name="Yes", kind="outcome", unit="%")
+
+    statuses = []
+    task = asyncio.ensure_future(
+        provider.stream([ref], _noop_on_quote, _noop_on_trade, _noop_on_event, statuses.append)
+    )
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    assert [s.phase for s in statuses] == ["connecting"]
+
+    manager = _FakeWsManager.last_instance
+    assert manager is not None
+    manager.on_connection_state_change(True)
+    manager.on_connection_state_change(False)
+    manager.on_connection_state_change(True)
+
+    assert [s.phase for s in statuses] == ["connecting", "connected", "reconnecting", "connected"]
+    assert statuses[-1].reconnect_count == 1
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
 
 
 class TestDispatchWsMessage:
