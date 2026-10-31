@@ -33,3 +33,7 @@ Linux environment or is inferred from CI's `Lint and test` workflow being green;
 - **CFG-13** Adding the same instrument id twice under one account aborts `already_configured`.
 - **CFG-14** Thresholds field parses a comma-separated list (`"30,50,70"` → `[30.0, 50.0, 70.0]`),
   tolerates stray whitespace, empty string → `[]`.
+- **CFG-15** The confirm step's description (`"Tracking **{name}** ({symbol})."`) never duplicates
+  the symbol - regression test for BUG-001 (crypto's `InstrumentRef.name` baked the symbol in
+  twice: "Tracking Bitcoin (BTC) (BTC)."). Live-reproduced with two different coins (bitcoin,
+  ethereum) 2026-10-31; not yet covered by an automated test.
