@@ -75,7 +75,7 @@ blueprint:
           domain: input_boolean
 
 trigger:
-  - !input market_trigger
+  - triggers: !input market_trigger
   - id: marketsentry_snooze
     platform: event
     event_type: mobile_app_notification_action
