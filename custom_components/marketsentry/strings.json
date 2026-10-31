@@ -103,7 +103,7 @@
   "issues": {
     "market_not_found": {
       "title": "Polymarket market not found",
-      "description": "The tracked market '{slug}' could not be found on Polymarket. It may have been removed or archived. Remove and re-add the affected instrument with a valid market."
+      "description": "The tracked market {slug} could not be found on Polymarket. It may have been removed or archived. Remove and re-add the affected instrument with a valid market."
     }
   },
   "entity": {

@@ -23,6 +23,7 @@ from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -161,6 +162,9 @@ def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
     if kind == "fx":
         detectors.official_rate_published = OfficialRatePublishedDetector()
     return detectors
+
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, _config: Any) -> bool:

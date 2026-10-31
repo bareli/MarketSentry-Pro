@@ -3,6 +3,7 @@
   "name": "MarketSentry Pro",
   "codeowners": ["@bareli"],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/bareli/Polymarket-Manager-Pro",
   "integration_type": "service",
   "iot_class": "cloud_push",
