@@ -7,9 +7,26 @@ aiohttp-only modules and must be runnable without the full `hass` fixture
 since homeassistant.runner imports the POSIX-only `fcntl` module). The
 `hass`-dependent config flow tests register that plugin themselves in
 tests/config_flow/conftest.py.
+
+pytest-homeassistant-custom-component registers itself via its own
+pytest11 entry point (see tests/config_flow/conftest.py's docstring) and
+brings in pytest-socket, which blocks real socket creation session-wide
+once loaded -- including the loopback sockets our aiohttp_client-based
+fake-server tests (test_api.py, test_ws.py, providers/test_*.py) need for
+their local test servers. Requesting the `socket_enabled` fixture
+re-enables sockets for the duration of a test; doing it autouse here
+covers every test module without touching each test's signature.
 """
 
 from __future__ import annotations
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _allow_sockets_for_local_test_servers(socket_enabled: None) -> None:
+    """No-op body: requesting `socket_enabled` is what re-enables sockets."""
+
 
 GAMMA_MARKET_FIXTURE = {
     "id": "1",
