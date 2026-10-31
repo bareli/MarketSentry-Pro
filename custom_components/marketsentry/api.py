@@ -94,7 +94,13 @@ class PolymarketApiClient:
             params={"q": query, "limit": limit},
         )
         if isinstance(data, dict):
-            return list(data.get("markets", []))
+            if "markets" in data:
+                return list(data.get("markets", []))
+            markets: list[dict[str, Any]] = []
+            for event in data.get("events", []):
+                if isinstance(event, dict):
+                    markets.extend(event.get("markets", []))
+            return markets[:limit]
         return list(data) if isinstance(data, list) else []
 
     # --- CLOB REST ---

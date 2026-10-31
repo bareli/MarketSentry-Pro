@@ -74,6 +74,23 @@ async def test_search_markets_returns_markets_key_from_dict_response(aiohttp_cli
     assert [r["slug"] for r in results] == ["a", "b"]
 
 
+async def test_search_markets_flattens_nested_events_response(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "events": [
+                    {"slug": "event-1", "markets": [{"slug": "a"}, {"slug": "b"}]},
+                    {"slug": "event-2", "markets": [{"slug": "c"}]},
+                ],
+                "tags": [],
+            }
+        )
+
+    api = await _client_for(aiohttp_client, "/public-search", handler)
+    results = await api.search_markets("election", limit=5)
+    assert [r["slug"] for r in results] == ["a", "b", "c"]
+
+
 async def test_search_markets_handles_bare_list_response(aiohttp_client) -> None:
     async def handler(request: web.Request) -> web.Response:
         return web.json_response([{"slug": "a"}])
