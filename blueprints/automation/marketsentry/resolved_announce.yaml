@@ -4,6 +4,10 @@ blueprint:
     When a tracked Polymarket outcome resolves, flash a light and/or
     text-to-speech announce the result. Pick the instrument's "Market
     resolved" device trigger; this fires exactly once per instrument.
+
+    Optionally, also send an actionable mobile-app notification with an
+    "Open dashboard" button, and a "Snooze" button that silences this
+    automation for a while - both off by default.
   domain: automation
   input:
     market_trigger:
@@ -35,34 +39,111 @@ blueprint:
       selector:
         entity:
           domain: tts
+    mobile_notify_target:
+      name: Phone for actionable notification (optional)
+      description: >-
+        Leave empty to skip. If set, also sends a mobile-app notification
+        with an "Open dashboard" button (and a "Snooze" button, if a snooze
+        helper below is configured too).
+      default: ""
+      selector:
+        entity:
+          domain: notify
+    snooze_hours:
+      name: Snooze duration in hours (optional)
+      description: >-
+        How long tapping the Snooze button silences this automation
+        (the light flash, TTS announcement and actionable notification).
+        Needs a snooze helper below; 0 disables the Snooze button.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 168
+          step: 1
+          unit_of_measurement: h
+    snooze_helper:
+      name: Snooze helper (optional)
+      description: >-
+        An `input_boolean` helper dedicated to this automation (create one
+        under Settings > Devices & services > Helpers, one per automation
+        built from this blueprint). While it is on, this automation stays
+        silent. Leave empty to disable snoozing.
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
 
-trigger: !input market_trigger
+trigger:
+  - !input market_trigger
+  - id: marketsentry_snooze
+    platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: !input snooze_helper
 
 variables:
   flash_light: !input flash_light
   tts_target: !input tts_target
   tts_entity: !input tts_entity
+  mobile_notify_target: !input mobile_notify_target
+  snooze_hours: !input snooze_hours
+  snooze_helper: !input snooze_helper
   outcome_name: "{{ trigger.event.data.name }}"
   winning_outcome: "{{ trigger.event.data.winning_outcome }}"
+  notify_actions: >-
+    {{ [{"action": "URI", "title": "Open dashboard", "uri": "/config/integrations/integration/marketsentry"}] +
+       ([{"action": snooze_helper, "title": "Snooze " ~ (snooze_hours | int) ~ "h"}]
+        if (snooze_hours | float(0)) > 0 and snooze_helper not in [none, ""] else []) }}
 
 action:
   - if:
       - condition: template
-        value_template: "{{ flash_light is not none and flash_light != [] }}"
+        value_template: "{{ trigger.id == 'marketsentry_snooze' }}"
     then:
-      - action: light.turn_on
-        target: !input flash_light
-        data:
-          flash: long
-          color_name: "{{ 'green' if winning_outcome is not none else 'blue' }}"
-  - if:
-      - condition: template
-        value_template: "{{ tts_entity not in [none, ''] and tts_target is not none and tts_target != [] }}"
-    then:
-      - action: tts.speak
+      - action: input_boolean.turn_on
         target:
-          entity_id: !input tts_entity
-        data:
-          media_player_entity_id: "{{ (tts_target.entity_id | default([]) ) }}"
-          message: >-
-            {{ outcome_name }} resolved{{ ' as ' ~ winning_outcome if winning_outcome is not none else '' }}.
+          entity_id: !input snooze_helper
+      - delay:
+          hours: "{{ snooze_hours }}"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: !input snooze_helper
+    else:
+      - if:
+          - condition: template
+            value_template: >-
+              {{ snooze_helper in [none, ""] or not is_state(snooze_helper, 'on') }}
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ flash_light is not none and flash_light != [] }}"
+            then:
+              - action: light.turn_on
+                target: !input flash_light
+                data:
+                  flash: long
+                  color_name: "{{ 'green' if winning_outcome is not none else 'blue' }}"
+          - if:
+              - condition: template
+                value_template: "{{ tts_entity not in [none, ''] and tts_target is not none and tts_target != [] }}"
+            then:
+              - action: tts.speak
+                target:
+                  entity_id: !input tts_entity
+                data:
+                  media_player_entity_id: "{{ (tts_target.entity_id | default([]) ) }}"
+                  message: >-
+                    {{ outcome_name }} resolved{{ ' as ' ~ winning_outcome if winning_outcome is not none else '' }}.
+          - if:
+              - condition: template
+                value_template: "{{ mobile_notify_target not in [none, ''] }}"
+            then:
+              - action: notify.send_message
+                target:
+                  entity_id: !input mobile_notify_target
+                data:
+                  message: >-
+                    {{ outcome_name }} resolved{{ ' as ' ~ winning_outcome if winning_outcome is not none else '' }}.
+                  data:
+                    actions: "{{ notify_actions }}"

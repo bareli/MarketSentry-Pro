@@ -43,10 +43,15 @@ def _render(inputs: dict[str, Any], winning_outcome: str | None = "Yes") -> dict
     variables = render_variables(blueprint, inputs, registry, extra_context={"trigger": trigger})
     context = {**variables, "trigger": trigger}
 
+    # ENH-016 wrapped the original two branches inside a new outer "is this
+    # automation currently snoozed" if/else (see test_enh016_actionable_
+    # notifications.py) - the branches themselves, and this test's
+    # assertions about them, are otherwise unchanged.
     substituted_action = substitute_inputs(blueprint["action"], blueprint, inputs)
-    light_condition = substituted_action[0]["if"][0]["value_template"]
-    tts_condition = substituted_action[1]["if"][0]["value_template"]
-    tts_message_template = substituted_action[1]["then"][0]["data"]["message"]
+    not_snoozed_branches = substituted_action[0]["else"][0]["then"]
+    light_condition = not_snoozed_branches[0]["if"][0]["value_template"]
+    tts_condition = not_snoozed_branches[1]["if"][0]["value_template"]
+    tts_message_template = not_snoozed_branches[1]["then"][0]["data"]["message"]
 
     return {
         "light_fires": render_template(light_condition, registry, context),
