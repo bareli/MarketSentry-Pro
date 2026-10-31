@@ -1,237 +1,342 @@
-"""Config flow for MarketSentry Pro: UI-only, config + options + reconfigure."""
+"""Config flow for MarketSentry Pro.
+
+One config entry = one provider account (credentials step only for
+providers that need a key). Each tracked instrument is added afterward as
+a config *subentry* under that entry, so adding/removing/reconfiguring
+instruments never re-asks for credentials.
+"""
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
-    SOURCE_IMPORT,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
 )
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import (
-    PolymarketApiClient,
-    PolymarketApiError,
-    PolymarketNotFoundError,
-    parse_polymarket_url_or_slug,
-)
 from .const import (
-    CONF_KIND,
-    CONF_OUTCOME_TOKEN_IDS,
-    CONF_SLUG,
-    CONF_URL_OR_SLUG,
-    DEFAULT_CLOSING_SOON_HOURS,
-    DEFAULT_COOLDOWN_MIN,
-    DEFAULT_HYSTERESIS_PP,
-    DEFAULT_LARGE_TRADE_USD,
-    DEFAULT_MOVE_DELTA_PP,
-    DEFAULT_MOVE_WINDOW_MIN,
-    DEFAULT_THRESHOLDS,
-    DEFAULT_VOLUME_SPIKE_PCT,
+    CONF_API_KEY,
+    CONF_EXTRA,
+    CONF_FEED,
+    CONF_INSTRUMENT_ID,
+    CONF_INSTRUMENT_KIND,
+    CONF_INSTRUMENT_NAME,
+    CONF_KEY_ID,
+    CONF_OPTIONS,
+    CONF_PROVIDER,
+    CONF_SECRET_KEY,
+    CONF_SYMBOL,
+    CONF_UNIT,
+    CONF_URL,
+    CONF_URL_OR_QUERY,
     DOMAIN,
-    KIND_MARKET,
     OPT_CLOSING_SOON_HOURS,
     OPT_COOLDOWN_MIN,
-    OPT_HYSTERESIS_PP,
+    OPT_DAILY_CHANGE_PCT,
+    OPT_EXTENDED_HOURS,
+    OPT_HYSTERESIS,
     OPT_LARGE_TRADE_USD,
-    OPT_MOVE_DELTA_PP,
+    OPT_MARKET_OPEN_GAP_PCT,
+    OPT_MOVE_DELTA,
     OPT_MOVE_WINDOW_MIN,
     OPT_THRESHOLDS,
     OPT_VOLUME_SPIKE_PCT,
+    PROVIDER_KEYS,
+    SUBENTRY_TYPE_INSTRUMENT,
+    default_options_for_kind,
+)
+from .providers import PROVIDERS, build_provider
+from .providers.base import CannotConnect, InstrumentRef, InvalidAuth, Provider
+
+STEP_PROVIDER_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PROVIDER): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=key, label=PROVIDERS[key].name)
+                    for key in PROVIDER_KEYS
+                ]
+            )
+        )
+    }
 )
 
-_LOGGER = logging.getLogger(__name__)
+STEP_INSTRUMENT_SCHEMA = vol.Schema({vol.Required(CONF_URL_OR_QUERY): str})
 
-STEP_USER_SCHEMA = vol.Schema({vol.Required(CONF_URL_OR_SLUG): str})
+
+def _thresholds_to_str(thresholds: list[float]) -> str:
+    return ",".join(str(t) for t in thresholds)
+
+
+def _parse_thresholds(raw: str) -> list[float]:
+    return [float(t.strip()) for t in raw.split(",") if t.strip()]
+
+
+def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {
+        vol.Optional(OPT_THRESHOLDS, default=_thresholds_to_str(defaults.get(OPT_THRESHOLDS, []))): str,
+        vol.Optional(OPT_HYSTERESIS, default=defaults.get(OPT_HYSTERESIS, 0.0)): vol.Coerce(float),
+        vol.Optional(OPT_MOVE_DELTA, default=defaults.get(OPT_MOVE_DELTA, 5.0)): vol.Coerce(float),
+        vol.Optional(OPT_MOVE_WINDOW_MIN, default=defaults.get(OPT_MOVE_WINDOW_MIN, 60)): vol.Coerce(int),
+        vol.Optional(OPT_COOLDOWN_MIN, default=defaults.get(OPT_COOLDOWN_MIN, 15)): vol.Coerce(int),
+    }
+    if kind in ("stock", "fx"):
+        fields[
+            vol.Optional(OPT_DAILY_CHANGE_PCT, default=defaults.get(OPT_DAILY_CHANGE_PCT, 3.0))
+        ] = vol.Coerce(float)
+    if kind in ("outcome", "stock"):
+        fields[
+            vol.Optional(OPT_LARGE_TRADE_USD, default=defaults.get(OPT_LARGE_TRADE_USD, 10000.0))
+        ] = vol.Coerce(float)
+    if kind == "outcome":
+        fields[
+            vol.Optional(OPT_VOLUME_SPIKE_PCT, default=defaults.get(OPT_VOLUME_SPIKE_PCT, 50.0))
+        ] = vol.Coerce(float)
+        fields[
+            vol.Optional(OPT_CLOSING_SOON_HOURS, default=defaults.get(OPT_CLOSING_SOON_HOURS, 24))
+        ] = vol.Coerce(int)
+    if kind == "stock":
+        fields[
+            vol.Optional(OPT_MARKET_OPEN_GAP_PCT, default=defaults.get(OPT_MARKET_OPEN_GAP_PCT, 3.0))
+        ] = vol.Coerce(float)
+        fields[vol.Optional(OPT_EXTENDED_HOURS, default=defaults.get(OPT_EXTENDED_HOURS, False))] = bool
+    return vol.Schema(fields)
+
+
+def _parse_options_form(kind: str, user_input: dict[str, Any]) -> dict[str, Any]:
+    opts = dict(default_options_for_kind(kind))
+    opts[OPT_THRESHOLDS] = _parse_thresholds(user_input.get(OPT_THRESHOLDS, ""))
+    for key in (
+        OPT_HYSTERESIS,
+        OPT_MOVE_DELTA,
+        OPT_MOVE_WINDOW_MIN,
+        OPT_DAILY_CHANGE_PCT,
+        OPT_LARGE_TRADE_USD,
+        OPT_VOLUME_SPIKE_PCT,
+        OPT_CLOSING_SOON_HOURS,
+        OPT_MARKET_OPEN_GAP_PCT,
+        OPT_EXTENDED_HOURS,
+        OPT_COOLDOWN_MIN,
+    ):
+        if key in user_input:
+            opts[key] = user_input[key]
+    return opts
 
 
 class MarketSentryConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the config flow: parse URL/slug -> confirm -> (pick sub-markets)."""
+    """Set up one provider account. Instruments are added afterward as subentries."""
 
     VERSION = 1
     MINOR_VERSION = 1
 
     def __init__(self) -> None:
-        self._event_data: dict[str, Any] | None = None
-        self._market_slug: str | None = None
-        self._market_question: str | None = None
+        self._provider_key: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            try:
-                parsed = parse_polymarket_url_or_slug(user_input[CONF_URL_OR_SLUG])
-            except ValueError:
-                errors["base"] = "invalid_url"
-            else:
-                session = async_get_clientsession(self.hass)
-                api = PolymarketApiClient(session)
-                try:
-                    if parsed.kind == KIND_MARKET:
-                        market = await api.get_market_by_slug(parsed.slug)
-                        self._market_slug = market.slug
-                        self._market_question = market.question
-                        return await self.async_step_confirm_market()
+            self._provider_key = user_input[CONF_PROVIDER]
+            await self.async_set_unique_id(self._provider_key)
+            self._abort_if_unique_id_configured()
 
-                    event = await api.get_event_by_slug(parsed.slug)
-                    markets = event.get("markets", [])
-                    if len(markets) == 1:
-                        self._market_slug = markets[0]["slug"]
-                        self._market_question = markets[0].get("question", event.get("title", ""))
-                        return await self.async_step_confirm_market()
+            if not PROVIDERS[self._provider_key].requires_api_key:
+                return await self._async_finish_no_credentials()
+            if self._provider_key == "finnhub":
+                return await self.async_step_finnhub_credentials()
+            return await self.async_step_alpaca_credentials()
 
-                    self._event_data = event
-                    return await self.async_step_select_markets()
-                except PolymarketNotFoundError:
-                    errors["base"] = "not_found"
-                except PolymarketApiError:
-                    errors["base"] = "cannot_connect"
+        return self.async_show_form(step_id="user", data_schema=STEP_PROVIDER_SCHEMA)
 
-        return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
-        )
-
-    async def async_step_confirm_market(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        assert self._market_slug is not None
-
-        if user_input is not None:
-            return await self._async_create_market_entry(self._market_slug, self._market_question or self._market_slug)
-
-        return self.async_show_form(
-            step_id="confirm_market",
-            data_schema=vol.Schema({}),
-            description_placeholders={"question": self._market_question or self._market_slug},
-        )
-
-    async def async_step_select_markets(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        assert self._event_data is not None
-        markets = self._event_data.get("markets", [])
-        options = [
-            selector.SelectOptionDict(value=m["slug"], label=m.get("question", m["slug"]))
-            for m in markets
-        ]
-
-        if user_input is not None:
-            selected_slugs: list[str] = user_input["markets"]
-            if not selected_slugs:
-                return self.async_show_form(
-                    step_id="select_markets",
-                    data_schema=self._select_markets_schema(options),
-                    errors={"base": "no_markets_selected"},
-                )
-
-            slug_to_question = {m["slug"]: m.get("question", m["slug"]) for m in markets}
-
-            for slug in selected_slugs[1:]:
-                await self.hass.config_entries.flow.async_init(
-                    DOMAIN,
-                    context={"source": SOURCE_IMPORT},
-                    data={CONF_SLUG: slug, "question": slug_to_question[slug]},
-                )
-
-            first_slug = selected_slugs[0]
-            return await self._async_create_market_entry(first_slug, slug_to_question[first_slug])
-
-        return self.async_show_form(
-            step_id="select_markets", data_schema=self._select_markets_schema(options)
-        )
-
-    @staticmethod
-    def _select_markets_schema(options: list[selector.SelectOptionDict]) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Required("markets"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=options, multiple=True)
-                )
-            }
-        )
-
-    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
-        """Create an additional entry for a sub-market picked in async_step_select_markets."""
-        return await self._async_create_market_entry(import_data[CONF_SLUG], import_data["question"])
-
-    async def _async_create_market_entry(self, slug: str, question: str) -> ConfigFlowResult:
-        await self.async_set_unique_id(slug)
-        self._abort_if_unique_id_configured()
+    async def _async_finish_no_credentials(self) -> ConfigFlowResult:
+        assert self._provider_key is not None
+        session = async_get_clientsession(self.hass)
+        provider = build_provider(session, self._provider_key, {})
+        await provider.validate({})
         return self.async_create_entry(
-            title=question,
-            data={
-                CONF_KIND: KIND_MARKET,
-                CONF_SLUG: slug,
-                CONF_OUTCOME_TOKEN_IDS: [],
-            },
+            title=PROVIDERS[self._provider_key].name,
+            data={CONF_PROVIDER: self._provider_key},
         )
 
-    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Allow re-pointing an existing entry at a different URL/slug."""
-        return await self.async_step_user(user_input)
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return MarketSentryOptionsFlow()
-
-
-class MarketSentryOptionsFlow(OptionsFlow):
-    """Options flow: change detection thresholds for an existing entry."""
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_finnhub_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            thresholds_raw = user_input[OPT_THRESHOLDS]
-            thresholds = [float(t.strip()) for t in thresholds_raw.split(",") if t.strip()]
-            return self.async_create_entry(
-                data={
-                    OPT_THRESHOLDS: thresholds,
-                    OPT_HYSTERESIS_PP: user_input[OPT_HYSTERESIS_PP],
-                    OPT_MOVE_DELTA_PP: user_input[OPT_MOVE_DELTA_PP],
-                    OPT_MOVE_WINDOW_MIN: user_input[OPT_MOVE_WINDOW_MIN],
-                    OPT_LARGE_TRADE_USD: user_input[OPT_LARGE_TRADE_USD],
-                    OPT_VOLUME_SPIKE_PCT: user_input[OPT_VOLUME_SPIKE_PCT],
-                    OPT_CLOSING_SOON_HOURS: user_input[OPT_CLOSING_SOON_HOURS],
-                    OPT_COOLDOWN_MIN: user_input[OPT_COOLDOWN_MIN],
-                }
-            )
+            session = async_get_clientsession(self.hass)
+            provider = build_provider(session, "finnhub", user_input)
+            try:
+                await provider.validate(user_input)
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_create_entry(
+                    title=PROVIDERS["finnhub"].name,
+                    data={CONF_PROVIDER: "finnhub", CONF_API_KEY: user_input[CONF_API_KEY]},
+                )
 
-        opts = self.config_entry.options
-        thresholds_default = ",".join(str(t) for t in opts.get(OPT_THRESHOLDS, DEFAULT_THRESHOLDS))
+        schema = vol.Schema({vol.Required(CONF_API_KEY): str})
+        return self.async_show_form(
+            step_id="finnhub_credentials", data_schema=schema, errors=errors
+        )
+
+    async def async_step_alpaca_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            session = async_get_clientsession(self.hass)
+            provider = build_provider(session, "alpaca", user_input)
+            try:
+                await provider.validate(user_input)
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_create_entry(
+                    title=PROVIDERS["alpaca"].name,
+                    data={
+                        CONF_PROVIDER: "alpaca",
+                        CONF_KEY_ID: user_input[CONF_KEY_ID],
+                        CONF_SECRET_KEY: user_input[CONF_SECRET_KEY],
+                        CONF_FEED: user_input.get(CONF_FEED, "iex"),
+                    },
+                )
 
         schema = vol.Schema(
             {
-                vol.Required(OPT_THRESHOLDS, default=thresholds_default): str,
-                vol.Required(
-                    OPT_HYSTERESIS_PP, default=opts.get(OPT_HYSTERESIS_PP, DEFAULT_HYSTERESIS_PP)
-                ): vol.Coerce(float),
-                vol.Required(
-                    OPT_MOVE_DELTA_PP, default=opts.get(OPT_MOVE_DELTA_PP, DEFAULT_MOVE_DELTA_PP)
-                ): vol.Coerce(float),
-                vol.Required(
-                    OPT_MOVE_WINDOW_MIN,
-                    default=opts.get(OPT_MOVE_WINDOW_MIN, DEFAULT_MOVE_WINDOW_MIN),
-                ): vol.Coerce(int),
-                vol.Required(
-                    OPT_LARGE_TRADE_USD,
-                    default=opts.get(OPT_LARGE_TRADE_USD, DEFAULT_LARGE_TRADE_USD),
-                ): vol.Coerce(float),
-                vol.Required(
-                    OPT_VOLUME_SPIKE_PCT,
-                    default=opts.get(OPT_VOLUME_SPIKE_PCT, DEFAULT_VOLUME_SPIKE_PCT),
-                ): vol.Coerce(float),
-                vol.Required(
-                    OPT_CLOSING_SOON_HOURS,
-                    default=opts.get(OPT_CLOSING_SOON_HOURS, DEFAULT_CLOSING_SOON_HOURS),
-                ): vol.Coerce(int),
-                vol.Required(
-                    OPT_COOLDOWN_MIN, default=opts.get(OPT_COOLDOWN_MIN, DEFAULT_COOLDOWN_MIN)
-                ): vol.Coerce(int),
+                vol.Required(CONF_KEY_ID): str,
+                vol.Required(CONF_SECRET_KEY): str,
+                vol.Optional(CONF_FEED, default="iex"): vol.In(["iex", "sip"]),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(
+            step_id="alpaca_credentials", data_schema=schema, errors=errors
+        )
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_TYPE_INSTRUMENT: InstrumentSubentryFlow}
+
+
+class InstrumentSubentryFlow(ConfigSubentryFlow):
+    """Add or reconfigure one tracked instrument under a provider entry."""
+
+    def __init__(self) -> None:
+        self._pending_ref: InstrumentRef | None = None
+        self._pending_choices: dict[str, InstrumentRef] = {}
+
+    def _build_provider(self) -> Provider:
+        entry = self._get_entry()
+        session = async_get_clientsession(self.hass)
+        return build_provider(session, entry.data[CONF_PROVIDER], dict(entry.data))
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            provider = self._build_provider()
+            query = user_input[CONF_URL_OR_QUERY]
+            refs: list[InstrumentRef] = []
+            try:
+                refs = await provider.resolve(query)
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
+                try:
+                    refs = await provider.search(query, limit=10)
+                except (CannotConnect, InvalidAuth):
+                    refs = []
+
+            if not refs and not errors:
+                errors["base"] = "not_found"
+
+            if refs and not errors:
+                if len(refs) == 1:
+                    self._pending_ref = refs[0]
+                    return await self.async_step_confirm()
+                self._pending_choices = {ref.id: ref for ref in refs}
+                return await self.async_step_select()
+
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_INSTRUMENT_SCHEMA, errors=errors
+        )
+
+    async def async_step_select(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        if user_input is not None:
+            self._pending_ref = self._pending_choices[user_input["instrument"]]
+            return await self.async_step_confirm()
+
+        options = [
+            selector.SelectOptionDict(value=ref.id, label=f"{ref.symbol} - {ref.name}")
+            for ref in self._pending_choices.values()
+        ]
+        schema = vol.Schema(
+            {
+                vol.Required("instrument"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=options)
+                )
+            }
+        )
+        return self.async_show_form(step_id="select", data_schema=schema)
+
+    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        ref = self._pending_ref
+        assert ref is not None
+
+        entry = self._get_entry()
+        existing_ids = {
+            subentry.data.get(CONF_INSTRUMENT_ID) for subentry in entry.subentries.values()
+        }
+        if ref.id in existing_ids:
+            return self.async_abort(reason="already_configured")
+
+        if user_input is not None:
+            data = {
+                CONF_INSTRUMENT_ID: ref.id,
+                CONF_SYMBOL: ref.symbol,
+                CONF_INSTRUMENT_NAME: ref.name,
+                CONF_INSTRUMENT_KIND: ref.kind,
+                CONF_UNIT: ref.unit,
+                CONF_URL: ref.url,
+                CONF_EXTRA: ref.extra,
+                CONF_OPTIONS: _parse_options_form(ref.kind, user_input),
+            }
+            return self.async_create_entry(title=ref.name, data=data, unique_id=ref.id)
+
+        schema = _options_schema(ref.kind, default_options_for_kind(ref.kind))
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=schema,
+            description_placeholders={"name": ref.name, "symbol": ref.symbol},
+        )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        kind = subentry.data[CONF_INSTRUMENT_KIND]
+
+        if user_input is not None:
+            return self.async_update_and_abort(
+                entry,
+                subentry,
+                data_updates={CONF_OPTIONS: _parse_options_form(kind, user_input)},
+            )
+
+        schema = _options_schema(kind, subentry.data.get(CONF_OPTIONS, {}))
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=schema,
+            description_placeholders={"name": subentry.title},
+        )

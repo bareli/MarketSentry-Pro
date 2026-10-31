@@ -1,152 +1,237 @@
-"""Tests for config_flow.py: URL, slug, invalid input, multi-market event."""
+"""Tests for config_flow.py: provider picker, credentials, instrument subentries."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
 from homeassistant import config_entries, data_entry_flow
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 
-from custom_components.marketsentry.const import DOMAIN
-from custom_components.marketsentry.models import Market
-
-from ..conftest import (
-    GAMMA_EVENT_MULTI_MARKET_FIXTURE,
-    GAMMA_EVENT_SINGLE_MARKET_FIXTURE,
-    GAMMA_MARKET_FIXTURE,
-)
+from custom_components.marketsentry.const import CONF_PROVIDER, DOMAIN, SUBENTRY_TYPE_INSTRUMENT
+from custom_components.marketsentry.providers.base import CannotConnect, InstrumentRef, InvalidAuth
 
 
-async def test_user_flow_with_market_url(hass: HomeAssistant) -> None:
+def _ref(instrument_id: str = "AAPL", symbol: str = "AAPL", kind: str = "stock") -> InstrumentRef:
+    return InstrumentRef(
+        provider="finnhub",
+        id=instrument_id,
+        symbol=symbol,
+        name=f"{symbol} Inc",
+        kind=kind,
+        unit="USD",
+    )
+
+
+async def test_polymarket_entry_needs_no_credentials(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
-
     with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_market_by_slug",
-        return_value=Market.from_gamma(GAMMA_MARKET_FIXTURE),
+        "custom_components.marketsentry.providers.polymarket.PolymarketProvider.validate",
+        return_value=None,
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"],
-            {"url_or_slug": "https://polymarket.com/market/will-x-happen"},
+            result["flow_id"], {CONF_PROVIDER: "polymarket"}
         )
 
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
-    assert result["step_id"] == "confirm_market"
-
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
-    assert result["data"]["slug"] == "will-x-happen"
+    assert result["data"] == {CONF_PROVIDER: "polymarket"}
 
 
-async def test_user_flow_invalid_input(hass: HomeAssistant) -> None:
+async def test_duplicate_provider_entry_aborts(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.fx.FxProvider.validate", return_value=None
+    ):
+        await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_PROVIDER: "fx"})
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_PROVIDER: "fx"})
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_finnhub_credentials_invalid_auth(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"url_or_slug": "https://polymarket.com/"}
+        result["flow_id"], {CONF_PROVIDER: "finnhub"}
     )
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
-    assert result["errors"]["base"] == "invalid_url"
+    assert result["step_id"] == "finnhub_credentials"
+
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.validate",
+        side_effect=InvalidAuth("bad key"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"api_key": "bad"}
+        )
+    assert result["errors"]["base"] == "invalid_auth"
 
 
-async def test_user_flow_slug_not_found(hass: HomeAssistant) -> None:
-    from custom_components.marketsentry.api import PolymarketNotFoundError
-
+async def test_finnhub_credentials_success_creates_entry(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
-        side_effect=PolymarketNotFoundError("nope"),
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"url_or_slug": "does-not-exist"}
-        )
-    assert result["errors"]["base"] == "not_found"
-
-
-async def test_user_flow_single_market_event_skips_selection(hass: HomeAssistant) -> None:
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
-        return_value=GAMMA_EVENT_SINGLE_MARKET_FIXTURE,
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"url_or_slug": "some-event"}
-        )
-    assert result["step_id"] == "confirm_market"
-
-
-async def test_user_flow_multi_market_event_shows_selection(hass: HomeAssistant) -> None:
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
-        return_value=GAMMA_EVENT_MULTI_MARKET_FIXTURE,
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"url_or_slug": "multi-event"}
-        )
-    assert result["step_id"] == "select_markets"
-    assert result["data_schema"] is not None
-
-
-async def test_multi_market_selection_creates_multiple_entries(hass: HomeAssistant) -> None:
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_event_by_slug",
-        return_value=GAMMA_EVENT_MULTI_MARKET_FIXTURE,
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"url_or_slug": "multi-event"}
-        )
-
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"markets": ["sub-a", "sub-b"]}
+        result["flow_id"], {CONF_PROVIDER: "finnhub"}
     )
+
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.validate",
+        return_value=None,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"api_key": "good-key"}
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"]["api_key"] == "good-key"
+
+
+async def test_alpaca_credentials_cannot_connect(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PROVIDER: "alpaca"}
+    )
+    assert result["step_id"] == "alpaca_credentials"
+
+    with patch(
+        "custom_components.marketsentry.providers.alpaca.AlpacaProvider.validate",
+        side_effect=CannotConnect("down"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"key_id": "k", "secret_key": "s"}
+        )
+    assert result["errors"]["base"] == "cannot_connect"
+
+
+async def _create_finnhub_entry(hass: HomeAssistant):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PROVIDER: "finnhub"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.validate",
+        return_value=None,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"api_key": "good-key"}
+        )
     await hass.async_block_till_done()
-
-    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
-    entries = hass.config_entries.async_entries(DOMAIN)
-    slugs = {e.data["slug"] for e in entries}
-    assert slugs == {"sub-a", "sub-b"}
+    return hass.config_entries.async_entries(DOMAIN)[0]
 
 
-async def test_options_flow_parses_comma_separated_thresholds(hass: HomeAssistant) -> None:
-    with patch(
-        "custom_components.marketsentry.api.PolymarketApiClient.get_market_by_slug",
-        return_value=Market.from_gamma(GAMMA_MARKET_FIXTURE),
-    ):
-        entry_result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
-        entry_result = await hass.config_entries.flow.async_configure(
-            entry_result["flow_id"],
-            {"url_or_slug": "https://polymarket.com/market/will-x-happen"},
-        )
-        entry_result = await hass.config_entries.flow.async_configure(entry_result["flow_id"], {})
+async def test_instrument_subentry_single_match_flow(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
 
-    entry = hass.config_entries.async_entries(DOMAIN)[0]
-    options_result = await hass.config_entries.options.async_init(entry.entry_id)
-    options_result = await hass.config_entries.options.async_configure(
-        options_result["flow_id"],
-        {
-            "thresholds": "20, 40, 60",
-            "hysteresis_pp": 0.5,
-            "move_delta_pp": 5.0,
-            "move_window_min": 60,
-            "large_trade_usd": 10000.0,
-            "volume_spike_pct": 50.0,
-            "closing_soon_hours": 24,
-            "cooldown_min": 15,
-        },
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
     )
-    assert options_result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
-    assert options_result["data"]["thresholds"] == [20.0, 40.0, 60.0]
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref()],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"]["symbol"] == "AAPL"
+
+
+async def test_instrument_subentry_multiple_matches_shows_select(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
+    refs = [_ref("AAPL", "AAPL"), _ref("AAPL.MX", "AAPL.MX")]
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        side_effect=CannotConnect("ambiguous"),
+    ), patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.search",
+        return_value=refs,
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "apple"}
+        )
+    assert result["step_id"] == "select"
+
+
+async def test_instrument_subentry_duplicate_aborts(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
+    ref = _ref()
+    hass.config_entries.async_add_subentry(
+        entry,
+        ConfigSubentry(
+            data={"instrument_id": ref.id, "symbol": ref.symbol},
+            subentry_type=SUBENTRY_TYPE_INSTRUMENT,
+            title=ref.name,
+            unique_id=ref.id,
+        ),
+    )
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[ref],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_instrument_subentry_reconfigure_updates_options(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
+    subentry = ConfigSubentry(
+        data={
+            "instrument_id": "AAPL",
+            "symbol": "AAPL",
+            "instrument_name": "AAPL Inc",
+            "instrument_kind": "stock",
+            "unit": "USD",
+            "options": {"thresholds": [], "cooldown_min": 15},
+        },
+        subentry_type=SUBENTRY_TYPE_INSTRUMENT,
+        title="AAPL Inc",
+        unique_id="AAPL",
+    )
+    hass.config_entries.async_add_subentry(entry, subentry)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT),
+        context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
+    )
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {"thresholds": "150,160", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 30},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
+    assert updated.data["options"]["thresholds"] == [150.0, 160.0]
+    assert updated.data["options"]["cooldown_min"] == 30

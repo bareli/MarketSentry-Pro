@@ -1,41 +1,70 @@
-"""Base entity for MarketSentry Pro: one HA device per tracked market."""
+"""Base entity for MarketSentry Pro: one HA device per tracked instrument
+(subentry), plus a per-entry diagnostics device for provider connection health.
+"""
 
 from __future__ import annotations
 
 import time
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER, STATE_WRITE_MIN_DELTA_PP, STATE_WRITE_MIN_INTERVAL_SEC
-from .coordinator import PolymarketMetadataCoordinator
+from .const import (
+    CONF_PROVIDER,
+    DOMAIN,
+    PROVIDER_MANUFACTURER,
+    STATE_WRITE_MIN_DELTA,
+    STATE_WRITE_MIN_INTERVAL_SEC,
+)
+from .coordinator import ProviderSnapshotCoordinator
+from .providers.base import InstrumentRef
+
+_MODEL_BY_KIND = {
+    "outcome": "Prediction market outcome",
+    "stock": "Stock",
+    "fx": "Exchange rate",
+}
 
 
-def market_device_info(market_slug: str, question: str) -> DeviceInfo:
-    """Build the HA device representing one tracked market."""
+def instrument_device_info(entry_id: str, ref: InstrumentRef) -> DeviceInfo:
+    """Build the HA device representing one tracked instrument (subentry)."""
     return DeviceInfo(
-        identifiers={(DOMAIN, market_slug)},
-        name=question,
-        manufacturer=MANUFACTURER,
-        model="Prediction market",
-        configuration_url=f"https://polymarket.com/market/{market_slug}",
+        identifiers={(DOMAIN, f"{entry_id}:{ref.id}")},
+        name=ref.name,
+        manufacturer=PROVIDER_MANUFACTURER.get(ref.provider, ref.provider),
+        model=_MODEL_BY_KIND.get(ref.kind, ref.kind),
+        configuration_url=ref.url,
     )
 
 
-class PolymarketEntity(CoordinatorEntity[PolymarketMetadataCoordinator]):
+def provider_connection_device_info(entry: ConfigEntry, provider_name: str) -> DeviceInfo:
+    """Entry-level device for connection diagnostics, not tied to an instrument."""
+    provider_key = entry.data.get(CONF_PROVIDER, "")
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry.entry_id}:_connection")},
+        name=f"{provider_name} connection",
+        manufacturer=PROVIDER_MANUFACTURER.get(provider_key, provider_key),
+        model="Provider connection",
+        entry_type=DeviceEntryType.SERVICE,
+    )
+
+
+class InstrumentEntity(CoordinatorEntity[ProviderSnapshotCoordinator]):
     """Common base: device grouping + recorder-friendly state throttling."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str) -> None:
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, ref: InstrumentRef) -> None:
         super().__init__(coordinator)
-        self._market_slug = market_slug
-        self._attr_device_info = market_device_info(market_slug, question)
+        self._entry_id = entry_id
+        self._ref = ref
+        self._attr_device_info = instrument_device_info(entry_id, ref)
         self._last_write_time: float = 0.0
         self._last_written_value: float | None = None
 
     def _should_write_throttled(self, new_value: float | None) -> bool:
-        """Throttle writes to protect the recorder: max once per 5s, min 0.1pp delta."""
+        """Throttle writes to protect the recorder: max once per 5s, min delta."""
         now = time.monotonic()
         if self._last_written_value is None or new_value is None:
             self._last_write_time = now
@@ -45,7 +74,7 @@ class PolymarketEntity(CoordinatorEntity[PolymarketMetadataCoordinator]):
         elapsed = now - self._last_write_time
         delta = abs(new_value - self._last_written_value)
 
-        if elapsed < STATE_WRITE_MIN_INTERVAL_SEC and delta < STATE_WRITE_MIN_DELTA_PP:
+        if elapsed < STATE_WRITE_MIN_INTERVAL_SEC and delta < STATE_WRITE_MIN_DELTA:
             return False
 
         self._last_write_time = now

@@ -2,13 +2,11 @@
 outcomes, stocks, FX pairs).
 
 No HA imports. Every function/class here is unit-testable in isolation.
-`ClosingSoonDetector` and `ResolvedDetector` are Polymarket-specific
-(callers simply don't use them for other kinds); everything else operates
-on plain numeric values and is kind-agnostic.
-
-The three event types below aren't wired into any HA entity yet (that
-lands with the generic coordinator/entity rewrite); they're kept here,
-not in const.EVENT_TYPES, so they don't appear as triggers HA can't fire.
+`ClosingSoonDetector` and `ResolvedDetector` are Polymarket-specific,
+`MarketOpenGapDetector` is stock-specific, and `OfficialRatePublishedDetector`
+is FX-specific (callers simply don't use them for other kinds); everything
+else operates on plain numeric values and is kind-agnostic. Which event
+types apply to which kind lives in const.EVENT_TYPES_BY_KIND.
 """
 
 from __future__ import annotations
@@ -19,16 +17,15 @@ from datetime import date, datetime, timedelta
 
 from .const import (
     EVENT_CLOSING_SOON,
+    EVENT_DAILY_CHANGE,
     EVENT_LARGE_TRADE,
+    EVENT_MARKET_OPEN_GAP,
+    EVENT_OFFICIAL_RATE_PUBLISHED,
     EVENT_PRICE_MOVE,
     EVENT_RESOLVED,
     EVENT_THRESHOLD_CROSSED,
     EVENT_VOLUME_SPIKE,
 )
-
-EVENT_DAILY_CHANGE = "daily_change"
-EVENT_MARKET_OPEN_GAP = "market_open_gap"
-EVENT_OFFICIAL_RATE_PUBLISHED = "official_rate_published"
 
 
 @dataclass(slots=True)

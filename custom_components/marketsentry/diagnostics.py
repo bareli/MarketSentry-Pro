@@ -1,46 +1,48 @@
-"""Diagnostics for MarketSentry Pro. Nothing sensitive to redact (read-only, no auth)."""
+"""Diagnostics for MarketSentry Pro.
+
+Credentials (Finnhub/Alpaca) are the only sensitive data this integration
+holds; everything else is public market data read without auth.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from . import MarketSentryConfigEntry
-from .const import DOMAIN
+from .const import CONF_API_KEY, CONF_KEY_ID, CONF_PROVIDER, CONF_SECRET_KEY
+
+TO_REDACT = {CONF_API_KEY, CONF_KEY_ID, CONF_SECRET_KEY}
 
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: MarketSentryConfigEntry
 ) -> dict[str, Any]:
-    tracker = entry.runtime_data.tracker
-    global_data = hass.data.get(DOMAIN)
+    runtime = entry.runtime_data
 
-    outcomes_diag = {
-        token_id: {
-            "outcome_name": ot.outcome_name,
-            "best_bid": ot.quote.best_bid,
-            "best_ask": ot.quote.best_ask,
-            "last_trade_price": ot.quote.last_trade_price,
-            "last_update": ot.quote.timestamp.isoformat() if ot.quote.timestamp else None,
+    trackers_diag = {
+        subentry_id: {
+            "kind": tracker.ref.kind,
+            "symbol": tracker.ref.symbol,
+            "last_price": tracker.last_quote.price,
+            "last_update": tracker.last_quote.ts.isoformat() if tracker.last_quote.ts else None,
+            "last_trade_price": tracker.last_trade.price if tracker.last_trade else None,
         }
-        for token_id, ot in tracker.outcomes.items()
+        for subentry_id, tracker in runtime.trackers.items()
     }
 
-    ws_diag: dict[str, Any] = {"available": global_data is not None}
-    if global_data is not None:
-        ws_diag.update(
-            {
-                "connected": global_data.ws_manager.connected,
-                "subscribed_token_count": global_data.ws_manager.subscribed_token_count,
-                "last_message_age_sec": global_data.ws_manager.last_message_age_sec,
-                "ws_down_since": global_data.ws_down_since,
-            }
-        )
+    polymarket_metadata_diag = {
+        slug: {"last_update_success": coordinator.last_update_success}
+        for slug, coordinator in runtime.polymarket_metadata.items()
+    }
 
     return {
-        "market_slug": tracker.market_slug,
-        "coordinator_last_update_success": tracker.coordinator.last_update_success,
-        "outcomes": outcomes_diag,
-        "websocket": ws_diag,
+        "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
+        "provider": entry.data.get(CONF_PROVIDER),
+        "snapshot_coordinator_last_update_success": runtime.snapshot_coordinator.last_update_success,
+        "stream_connected": runtime.stream_connected,
+        "trackers": trackers_diag,
+        "polymarket_metadata": polymarket_metadata_diag,
     }

@@ -60,6 +60,7 @@ def _market_to_refs(market: Market) -> list[InstrumentRef]:
             kind="outcome",
             unit="%",
             url=url,
+            extra={"market_slug": market.slug, "question": market.question},
         )
         for outcome in market.outcomes
         if outcome.token_id

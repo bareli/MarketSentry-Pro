@@ -28,6 +28,7 @@ class InstrumentRef:
     kind: InstrumentKind
     unit: str
     url: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

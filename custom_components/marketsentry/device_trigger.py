@@ -1,8 +1,10 @@
-"""Device triggers for MarketSentry Pro: one per detection event type."""
+"""Device triggers for MarketSentry Pro: one per detection event type that
+applies to the device's instrument kind.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
@@ -19,14 +21,38 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
-from .const import BUS_EVENT_PREFIX, DOMAIN, EVENT_TYPES
+from .const import BUS_EVENT_PREFIX, DOMAIN, EVENT_TYPES_BY_KIND
+
+if TYPE_CHECKING:
+    from . import MarketSentryConfigEntry
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
-    {vol.Required(CONF_TYPE): vol.In(EVENT_TYPES)}
+    {vol.Required(CONF_TYPE): vol.In(sorted({e for types in EVENT_TYPES_BY_KIND.values() for e in types}))}
 )
 
 
+def _tracker_kind_for_device(hass: HomeAssistant, device_id: str) -> str | None:
+    device_registry = dr.async_get(hass)
+    device = device_registry.devices.get(device_id)
+    if device is None:
+        return None
+
+    for entry_id in device.config_entries:
+        raw_entry = hass.config_entries.async_get_entry(entry_id)
+        if raw_entry is None or raw_entry.domain != DOMAIN:
+            continue
+        entry = cast("MarketSentryConfigEntry", raw_entry)
+        for subentry_id in device.config_entries_subentries.get(entry_id, set()):
+            tracker = entry.runtime_data.trackers.get(subentry_id) if subentry_id else None
+            if tracker is not None:
+                return str(tracker.ref.kind)
+    return None
+
+
 async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict[str, Any]]:
+    kind = _tracker_kind_for_device(hass, device_id)
+    if kind is None:
+        return []
     return [
         {
             CONF_PLATFORM: "device",
@@ -34,7 +60,7 @@ async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict[s
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: event_type,
         }
-        for event_type in EVENT_TYPES
+        for event_type in EVENT_TYPES_BY_KIND[kind]
     ]
 
 

@@ -32,6 +32,7 @@ def test_market_to_refs_yields_one_ref_per_outcome() -> None:
         kind="outcome",
         unit="%",
         url="https://polymarket.com/market/will-x-happen",
+        extra={"market_slug": "will-x-happen", "question": "Will X happen?"},
     )
 
 

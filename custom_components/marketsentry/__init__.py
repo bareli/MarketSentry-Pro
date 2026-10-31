@@ -1,456 +1,419 @@
-"""The MarketSentry Pro integration."""
+"""The MarketSentry Pro integration.
+
+One config entry = one provider account (Polymarket/FX need no credentials;
+Finnhub/Alpaca do). Each tracked instrument is a config *subentry* under
+that entry, so adding/removing instruments never re-asks for credentials.
+Subentry changes trigger Home Assistant's default reload-the-entry
+behavior, so `async_setup_entry` always rebuilds its trackers from
+`entry.subentries` rather than patching them in place.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
-import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from datetime import UTC, datetime
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
 
-from .api import PolymarketApiClient, PolymarketApiError, PolymarketNotFoundError
+from .api import PolymarketApiClient
 from .const import (
-    CONF_OUTCOME_TOKEN_IDS,
-    CONF_SLUG,
-    DEFAULT_CLOSING_SOON_HOURS,
-    DEFAULT_COOLDOWN_MIN,
-    DEFAULT_HYSTERESIS_PP,
-    DEFAULT_LARGE_TRADE_USD,
-    DEFAULT_MOVE_DELTA_PP,
-    DEFAULT_MOVE_WINDOW_MIN,
-    DEFAULT_THRESHOLDS,
-    DEFAULT_VOLUME_SPIKE_PCT,
+    BUS_EVENT_PREFIX,
+    CONF_EXTRA,
+    CONF_INSTRUMENT_ID,
+    CONF_INSTRUMENT_KIND,
+    CONF_INSTRUMENT_NAME,
+    CONF_OPTIONS,
+    CONF_PROVIDER,
+    CONF_SYMBOL,
+    CONF_UNIT,
+    CONF_URL,
     DOMAIN,
-    METADATA_UPDATE_INTERVAL_SEC,
     OPT_CLOSING_SOON_HOURS,
     OPT_COOLDOWN_MIN,
-    OPT_HYSTERESIS_PP,
+    OPT_DAILY_CHANGE_PCT,
+    OPT_HYSTERESIS,
     OPT_LARGE_TRADE_USD,
-    OPT_MOVE_DELTA_PP,
+    OPT_MARKET_OPEN_GAP_PCT,
+    OPT_MOVE_DELTA,
     OPT_MOVE_WINDOW_MIN,
     OPT_THRESHOLDS,
     OPT_VOLUME_SPIKE_PCT,
-    REST_FALLBACK_POLL_INTERVAL_SEC,
-    WS_DOWN_FALLBACK_THRESHOLD_SEC,
+    SUBENTRY_TYPE_INSTRUMENT,
 )
-from .coordinator import PolymarketMetadataCoordinator
+from .coordinator import PolymarketMetadataCoordinator, ProviderSnapshotCoordinator
 from .detector import (
     ClosingSoonDetector,
     CooldownGate,
+    DailyChangeDetector,
     DetectedEvent,
     LargeTradeDetector,
+    MarketOpenGapDetector,
+    OfficialRatePublishedDetector,
     PriceMoveDetector,
     ResolvedDetector,
     ThresholdDetector,
     VolumeSpikeDetector,
 )
-from .models import Quote, Trade
+from .market_calendar import market_state as calc_market_state
+from .providers import PROVIDERS, build_provider
+from .providers.base import InstrumentRef, Provider, ProviderEvent, Quote, Trade
 from .services import async_setup_services
-from .ws import PolymarketWsManager
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "binary_sensor", "event"]
 
 SIGNAL_QUOTE_UPDATE = f"{DOMAIN}_quote_update"
-SIGNAL_TRADE = f"{DOMAIN}_trade"
-SIGNAL_WS_STATE = f"{DOMAIN}_ws_state"
+SIGNAL_TRADE_UPDATE = f"{DOMAIN}_trade_update"
 SIGNAL_DETECTED_EVENT = f"{DOMAIN}_detected_event"
+SIGNAL_STREAM_STATE = f"{DOMAIN}_stream_state"
 
 
 @dataclass(slots=True)
-class OutcomeTracker:
-    """Per-outcome detector state, keyed under a MarketTracker."""
+class InstrumentDetectors:
+    """The subset of detectors that applies to one instrument's kind."""
 
-    outcome_name: str
-    token_id: str
     threshold: ThresholdDetector
     move: PriceMoveDetector
-    large_trade: LargeTradeDetector
-    quote: Quote = field(default_factory=lambda: Quote(token_id=""))
+    daily_change: DailyChangeDetector | None = None
+    large_trade: LargeTradeDetector | None = None
+    volume_spike: VolumeSpikeDetector | None = None
+    market_open_gap: MarketOpenGapDetector | None = None
+    closing_soon: ClosingSoonDetector | None = None
+    resolved: ResolvedDetector | None = None
+    official_rate_published: OfficialRatePublishedDetector | None = None
 
 
 @dataclass(slots=True)
-class MarketTracker:
-    """Runtime state for a single tracked market (one config entry)."""
+class InstrumentTracker:
+    """Runtime state for one tracked instrument (one subentry)."""
 
-    market_slug: str
-    coordinator: PolymarketMetadataCoordinator
-    outcomes: dict[str, OutcomeTracker]
-    volume_spike: VolumeSpikeDetector
-    closing_soon: ClosingSoonDetector
-    resolved: ResolvedDetector
+    subentry_id: str
+    ref: InstrumentRef
+    options: dict[str, Any]
+    detectors: InstrumentDetectors
     cooldown: CooldownGate
+    last_quote: Quote = field(default_factory=Quote)
+    last_trade: Trade | None = None
 
 
 @dataclass(slots=True)
 class MarketSentryRuntimeData:
     """Stored on entry.runtime_data."""
 
-    api: PolymarketApiClient
-    tracker: MarketTracker
-
-
-@dataclass(slots=True)
-class MarketSentryGlobalData:
-    """Shared singleton state across all config entries, in hass.data."""
-
-    ws_manager: PolymarketWsManager
-    token_to_entries: dict[str, set[str]] = field(default_factory=dict)
-    fallback_task: asyncio.Task[None] | None = None
-    ws_down_since: float | None = None
+    provider: Provider
+    provider_name: str
+    snapshot_coordinator: ProviderSnapshotCoordinator
+    trackers: dict[str, InstrumentTracker]
+    polymarket_metadata: dict[str, PolymarketMetadataCoordinator]
+    stream_task: asyncio.Task[None] | None = None
+    stream_connected: bool = False
 
 
 type MarketSentryConfigEntry = ConfigEntry[MarketSentryRuntimeData]
 
 
-def _build_options(entry: ConfigEntry) -> dict[str, Any]:
-    opts = entry.options
-    return {
-        OPT_THRESHOLDS: opts.get(OPT_THRESHOLDS, DEFAULT_THRESHOLDS),
-        OPT_HYSTERESIS_PP: opts.get(OPT_HYSTERESIS_PP, DEFAULT_HYSTERESIS_PP),
-        OPT_MOVE_DELTA_PP: opts.get(OPT_MOVE_DELTA_PP, DEFAULT_MOVE_DELTA_PP),
-        OPT_MOVE_WINDOW_MIN: opts.get(OPT_MOVE_WINDOW_MIN, DEFAULT_MOVE_WINDOW_MIN),
-        OPT_LARGE_TRADE_USD: opts.get(OPT_LARGE_TRADE_USD, DEFAULT_LARGE_TRADE_USD),
-        OPT_VOLUME_SPIKE_PCT: opts.get(OPT_VOLUME_SPIKE_PCT, DEFAULT_VOLUME_SPIKE_PCT),
-        OPT_CLOSING_SOON_HOURS: opts.get(OPT_CLOSING_SOON_HOURS, DEFAULT_CLOSING_SOON_HOURS),
-        OPT_COOLDOWN_MIN: opts.get(OPT_COOLDOWN_MIN, DEFAULT_COOLDOWN_MIN),
-    }
+def _ref_from_subentry_data(provider_key: str, data: Mapping[str, Any]) -> InstrumentRef:
+    return InstrumentRef(
+        provider=provider_key,
+        id=data[CONF_INSTRUMENT_ID],
+        symbol=data[CONF_SYMBOL],
+        name=data[CONF_INSTRUMENT_NAME],
+        kind=data[CONF_INSTRUMENT_KIND],
+        unit=data.get(CONF_UNIT, ""),
+        url=data.get(CONF_URL),
+        extra=data.get(CONF_EXTRA, {}),
+    )
+
+
+def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
+    detectors = InstrumentDetectors(
+        threshold=ThresholdDetector(opts.get(OPT_THRESHOLDS, []), opts.get(OPT_HYSTERESIS, 0.0)),
+        move=PriceMoveDetector(
+            opts.get(OPT_MOVE_DELTA, 5.0),
+            opts.get(OPT_MOVE_WINDOW_MIN, 60),
+            relative=kind != "outcome",
+        ),
+    )
+    if OPT_DAILY_CHANGE_PCT in opts:
+        detectors.daily_change = DailyChangeDetector(opts[OPT_DAILY_CHANGE_PCT])
+    if kind in ("outcome", "stock") and OPT_LARGE_TRADE_USD in opts:
+        detectors.large_trade = LargeTradeDetector(opts[OPT_LARGE_TRADE_USD])
+    if kind == "outcome":
+        detectors.volume_spike = VolumeSpikeDetector(opts.get(OPT_VOLUME_SPIKE_PCT, 50.0))
+        detectors.closing_soon = ClosingSoonDetector(opts.get(OPT_CLOSING_SOON_HOURS, 24))
+        detectors.resolved = ResolvedDetector()
+    if kind == "stock" and OPT_MARKET_OPEN_GAP_PCT in opts:
+        detectors.market_open_gap = MarketOpenGapDetector(opts[OPT_MARKET_OPEN_GAP_PCT])
+    if kind == "fx":
+        detectors.official_rate_published = OfficialRatePublishedDetector()
+    return detectors
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:
-    """Set up a MarketSentry Pro config entry (one tracked market)."""
+    """Set up a MarketSentry Pro config entry (one provider account)."""
     session = async_get_clientsession(hass)
-    api = PolymarketApiClient(session)
+    provider_key = entry.data[CONF_PROVIDER]
+    provider = build_provider(session, provider_key, dict(entry.data))
 
-    market_slug: str = entry.data[CONF_SLUG]
-    token_ids: list[str] = entry.data.get(CONF_OUTCOME_TOKEN_IDS, [])
+    snapshot_coordinator = ProviderSnapshotCoordinator(hass, provider, entry.title)
+    trackers: dict[str, InstrumentTracker] = {}
+    polymarket_metadata: dict[str, PolymarketMetadataCoordinator] = {}
+    polymarket_api: PolymarketApiClient | None = None
 
-    try:
-        market = await api.get_market_by_slug(market_slug)
-    except PolymarketNotFoundError as err:
-        ir.async_create_issue(
-            hass,
-            DOMAIN,
-            f"market_not_found_{market_slug}",
-            is_fixable=False,
-            severity=ir.IssueSeverity.ERROR,
-            translation_key="market_not_found",
-            translation_placeholders={"slug": market_slug},
-        )
-        raise ConfigEntryNotReady(f"Market '{market_slug}' not found") from err
-    except PolymarketApiError as err:
-        raise ConfigEntryNotReady(str(err)) from err
-
-    opts = _build_options(entry)
-
-    outcomes: dict[str, OutcomeTracker] = {}
-    for outcome in market.outcomes:
-        if token_ids and outcome.token_id not in token_ids:
+    for subentry_id, subentry in entry.subentries.items():
+        if subentry.subentry_type != SUBENTRY_TYPE_INSTRUMENT:
             continue
-        outcomes[outcome.token_id] = OutcomeTracker(
-            outcome_name=outcome.name,
-            token_id=outcome.token_id,
-            threshold=ThresholdDetector(opts[OPT_THRESHOLDS], opts[OPT_HYSTERESIS_PP]),
-            move=PriceMoveDetector(opts[OPT_MOVE_DELTA_PP], opts[OPT_MOVE_WINDOW_MIN]),
-            large_trade=LargeTradeDetector(opts[OPT_LARGE_TRADE_USD]),
-            quote=Quote(token_id=outcome.token_id),
+        ref = _ref_from_subentry_data(provider_key, subentry.data)
+        opts = subentry.data.get(CONF_OPTIONS, {})
+        trackers[subentry_id] = InstrumentTracker(
+            subentry_id=subentry_id,
+            ref=ref,
+            options=opts,
+            detectors=_build_detectors(ref.kind, opts),
+            cooldown=CooldownGate(opts.get(OPT_COOLDOWN_MIN, 15)),
         )
 
-    coordinator = PolymarketMetadataCoordinator(hass, api, market_slug)
-    await coordinator.async_config_entry_first_refresh()
+        market_slug = ref.extra.get("market_slug") if ref.kind == "outcome" else None
+        if market_slug and market_slug not in polymarket_metadata:
+            if polymarket_api is None:
+                polymarket_api = PolymarketApiClient(session)
+            metadata_coordinator = PolymarketMetadataCoordinator(hass, polymarket_api, market_slug)
+            await metadata_coordinator.async_refresh()
+            if not metadata_coordinator.last_update_success:
+                ir.async_create_issue(
+                    hass,
+                    DOMAIN,
+                    f"market_not_found_{market_slug}",
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="market_not_found",
+                    translation_placeholders={"slug": market_slug},
+                )
+            polymarket_metadata[market_slug] = metadata_coordinator
 
-    tracker = MarketTracker(
-        market_slug=market_slug,
-        coordinator=coordinator,
-        outcomes=outcomes,
-        volume_spike=VolumeSpikeDetector(opts[OPT_VOLUME_SPIKE_PCT]),
-        closing_soon=ClosingSoonDetector(opts[OPT_CLOSING_SOON_HOURS]),
-        resolved=ResolvedDetector(),
-        cooldown=CooldownGate(opts[OPT_COOLDOWN_MIN]),
+    snapshot_coordinator.refs = [tracker.ref for tracker in trackers.values()]
+    await snapshot_coordinator.async_config_entry_first_refresh()
+
+    runtime = MarketSentryRuntimeData(
+        provider=provider,
+        provider_name=PROVIDERS[provider_key].name,
+        snapshot_coordinator=snapshot_coordinator,
+        trackers=trackers,
+        polymarket_metadata=polymarket_metadata,
     )
+    entry.runtime_data = runtime
 
-    entry.runtime_data = MarketSentryRuntimeData(api=api, tracker=tracker)
+    @callback
+    def _handle_snapshot_update() -> None:
+        hass.async_create_task(_async_process_snapshot(hass, entry))
 
-    global_data = await _async_get_or_create_global_data(hass)
-    for token_id in outcomes:
-        global_data.token_to_entries.setdefault(token_id, set()).add(entry.entry_id)
-    await global_data.ws_manager.subscribe(list(outcomes.keys()))
+    entry.async_on_unload(snapshot_coordinator.async_add_listener(_handle_snapshot_update))
+    await _async_process_snapshot(hass, entry)
 
-    async def _handle_metadata_interval(_now: datetime) -> None:
-        await _async_check_metadata_events(hass, entry)
-
-    entry.async_on_unload(
-        async_track_time_interval(
-            hass,
-            _handle_metadata_interval,
-            timedelta(seconds=METADATA_UPDATE_INTERVAL_SEC),
-        )
-    )
+    await _async_start_streaming(hass, entry)
+    await async_setup_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:
-    """Unload a config entry and unsubscribe its tokens from the shared WS."""
+    """Unload a config entry and stop its streaming task, if any."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    if DOMAIN in hass.data:
-        global_data: MarketSentryGlobalData = hass.data[DOMAIN]
-        tracker = entry.runtime_data.tracker
-        tokens_to_unsubscribe: list[str] = []
-        for token_id in tracker.outcomes:
-            entries = global_data.token_to_entries.get(token_id)
-            if entries is None:
-                continue
-            entries.discard(entry.entry_id)
-            if not entries:
-                tokens_to_unsubscribe.append(token_id)
-                del global_data.token_to_entries[token_id]
-        if tokens_to_unsubscribe:
-            await global_data.ws_manager.unsubscribe(tokens_to_unsubscribe)
-
-        if not global_data.token_to_entries:
-            await global_data.ws_manager.stop()
-            if global_data.fallback_task is not None:
-                global_data.fallback_task.cancel()
-            del hass.data[DOMAIN]
+    runtime = entry.runtime_data
+    if runtime is not None and runtime.stream_task is not None:
+        runtime.stream_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await runtime.stream_task
 
     return unload_ok
 
 
-async def _async_get_or_create_global_data(hass: HomeAssistant) -> MarketSentryGlobalData:
-    if DOMAIN in hass.data:
-        return cast(MarketSentryGlobalData, hass.data[DOMAIN])
-
-    session = async_get_clientsession(hass)
-
-    async def on_message(message: dict[str, Any]) -> None:
-        await _async_handle_ws_message(hass, message)
-
-    @callback
-    def on_connection_state_change(connected: bool) -> None:
-        global_data = hass.data.get(DOMAIN)
-        if global_data is None:
-            return
-        if connected:
-            global_data.ws_down_since = None
-        else:
-            global_data.ws_down_since = time.monotonic()
-        async_dispatcher_send(hass, SIGNAL_WS_STATE, connected)
-
-    ws_manager = PolymarketWsManager(session, on_message, on_connection_state_change)
-    await ws_manager.start()
-
-    global_data = MarketSentryGlobalData(ws_manager=ws_manager)
-    hass.data[DOMAIN] = global_data
-
-    await async_setup_services(hass)
-
-    global_data.fallback_task = hass.async_create_task(_async_fallback_poll_loop(hass))
-
-    return global_data
+def _find_tracker_by_instrument_id(
+    runtime: MarketSentryRuntimeData, instrument_id: str
+) -> InstrumentTracker | None:
+    for tracker in runtime.trackers.values():
+        if tracker.ref.id == instrument_id:
+            return tracker
+    return None
 
 
-async def _async_fallback_poll_loop(hass: HomeAssistant) -> None:
-    """Poll /midpoint via REST for subscribed tokens whenever WS has been down too long."""
-    try:
-        while True:
-            await asyncio.sleep(REST_FALLBACK_POLL_INTERVAL_SEC)
-            global_data: MarketSentryGlobalData | None = hass.data.get(DOMAIN)
-            if global_data is None:
-                continue
-            if (
-                global_data.ws_down_since is None
-                or time.monotonic() - global_data.ws_down_since < WS_DOWN_FALLBACK_THRESHOLD_SEC
-            ):
-                continue
-
-            session = async_get_clientsession(hass)
-            api = PolymarketApiClient(session)
-            for token_id in list(global_data.token_to_entries.keys()):
-                try:
-                    mid = await api.get_midpoint(token_id)
-                except PolymarketApiError as err:
-                    _LOGGER.debug("Fallback poll failed for %s: %s", token_id, err)
-                    continue
-                if mid is not None:
-                    await _async_apply_quote(hass, token_id, best_bid=mid, best_ask=mid)
-    except asyncio.CancelledError:
-        pass
-
-
-async def _async_handle_ws_message(hass: HomeAssistant, message: dict[str, Any]) -> None:
-    """Route one WS event_type message to quote/trade/resolution handling."""
-    event_type = message.get("event_type")
-
-    if event_type == "price_change":
-        for change in message.get("price_changes", []):
-            token_id = change.get("asset_id")
-            if not token_id:
-                continue
-            await _async_apply_quote(
-                hass,
-                token_id,
-                best_bid=_to_float(change.get("best_bid")),
-                best_ask=_to_float(change.get("best_ask")),
-            )
-    elif event_type == "best_bid_ask":
-        token_id = message.get("asset_id")
-        if token_id:
-            await _async_apply_quote(
-                hass,
-                token_id,
-                best_bid=_to_float(message.get("best_bid")),
-                best_ask=_to_float(message.get("best_ask")),
-            )
-    elif event_type == "last_trade_price":
-        token_id = message.get("asset_id")
-        if token_id:
-            trade = Trade(
-                token_id=token_id,
-                price=_to_float(message.get("price")) or 0.0,
-                size=_to_float(message.get("size")) or 0.0,
-                side=str(message.get("side", "")),
-            )
-            await _async_apply_trade(hass, trade)
-    elif event_type == "market_resolved":
-        for token_id in message.get("assets_ids", []):
-            await _async_apply_resolution(hass, token_id, message.get("winning_asset_id"))
-
-
-def _to_float(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _find_entries_for_token(hass: HomeAssistant, token_id: str) -> list[MarketSentryConfigEntry]:
-    global_data: MarketSentryGlobalData | None = hass.data.get(DOMAIN)
-    if global_data is None:
-        return []
-    entry_ids = global_data.token_to_entries.get(token_id, set())
-    entries = []
-    for entry_id in entry_ids:
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is not None:
-            entries.append(entry)
-    return entries
-
-
-async def _async_apply_quote(
-    hass: HomeAssistant, token_id: str, best_bid: float | None, best_ask: float | None
-) -> None:
-    now = datetime.now(UTC)
-    for entry in _find_entries_for_token(hass, token_id):
-        tracker = entry.runtime_data.tracker
-        outcome_tracker = tracker.outcomes.get(token_id)
-        if outcome_tracker is None:
-            continue
-        if best_bid is not None:
-            outcome_tracker.quote.best_bid = best_bid
-        if best_ask is not None:
-            outcome_tracker.quote.best_ask = best_ask
-        outcome_tracker.quote.timestamp = now
-
-        mid = outcome_tracker.quote.midpoint
-        if mid is None:
-            continue
-        mid_pct = mid * 100
-
-        events: list[DetectedEvent] = []
-        events += outcome_tracker.threshold.update(outcome_tracker.outcome_name, token_id, mid_pct)
-        events += outcome_tracker.move.update(outcome_tracker.outcome_name, token_id, mid_pct, now)
-        events = tracker.cooldown.filter_events(events, now)
-
-        async_dispatcher_send(hass, f"{SIGNAL_QUOTE_UPDATE}_{token_id}", outcome_tracker.quote)
-        for event in events:
-            _async_fire_detected_event(hass, entry, event)
-
-
-async def _async_apply_trade(hass: HomeAssistant, trade: Trade) -> None:
-    now = datetime.now(UTC)
-    for entry in _find_entries_for_token(hass, trade.token_id):
-        tracker = entry.runtime_data.tracker
-        outcome_tracker = tracker.outcomes.get(trade.token_id)
-        if outcome_tracker is None:
-            continue
-        outcome_tracker.quote.last_trade_price = trade.price
-        trade.timestamp = now
-
-        events = outcome_tracker.large_trade.check(
-            outcome_tracker.outcome_name, trade.token_id, trade.price, trade.size
-        )
-        events = tracker.cooldown.filter_events(events, now)
-
-        async_dispatcher_send(hass, f"{SIGNAL_TRADE}_{trade.token_id}", trade)
-        for event in events:
-            _async_fire_detected_event(hass, entry, event)
-
-
-async def _async_apply_resolution(hass: HomeAssistant, token_id: str, winning_asset_id: str | None) -> None:
-    now = datetime.now(UTC)
-    for entry in _find_entries_for_token(hass, token_id):
-        tracker = entry.runtime_data.tracker
-        outcome_tracker = tracker.outcomes.get(token_id)
-        if outcome_tracker is None:
-            continue
-        winning_outcome = outcome_tracker.outcome_name if token_id == winning_asset_id else None
-        events = tracker.resolved.check(outcome_tracker.outcome_name, token_id, True, winning_outcome)
-        events = tracker.cooldown.filter_events(events, now)
-        for event in events:
-            _async_fire_detected_event(hass, entry, event)
-
-
-async def _async_check_metadata_events(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> None:
-    """Check volume-spike / closing-soon / resolved against the latest Gamma metadata."""
-    tracker = entry.runtime_data.tracker
-    data = tracker.coordinator.data
-    if data is None:
+async def _async_start_streaming(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> None:
+    runtime = entry.runtime_data
+    if not runtime.provider.supports_streaming or not runtime.trackers:
         return
-    market = data.market
+
+    refs = [tracker.ref for tracker in runtime.trackers.values()]
+
+    async def on_quote(instrument_id: str, quote: Quote) -> None:
+        tracker = _find_tracker_by_instrument_id(runtime, instrument_id)
+        if tracker is not None:
+            await _async_process_quote(hass, entry, tracker, quote)
+
+    async def on_trade(instrument_id: str, trade: Trade) -> None:
+        tracker = _find_tracker_by_instrument_id(runtime, instrument_id)
+        if tracker is not None:
+            await _async_process_trade(hass, entry, tracker, trade)
+
+    async def on_event(instrument_id: str, provider_event: ProviderEvent) -> None:
+        tracker = _find_tracker_by_instrument_id(runtime, instrument_id)
+        if tracker is not None:
+            await _async_process_provider_event(hass, entry, tracker, provider_event)
+
+    async def run() -> None:
+        runtime.stream_connected = True
+        async_dispatcher_send(hass, f"{SIGNAL_STREAM_STATE}_{entry.entry_id}", True)
+        try:
+            await runtime.provider.stream(refs, on_quote, on_trade, on_event)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Stream for entry %s ended: %s", entry.entry_id, type(err).__name__)
+        finally:
+            runtime.stream_connected = False
+            async_dispatcher_send(hass, f"{SIGNAL_STREAM_STATE}_{entry.entry_id}", False)
+
+    runtime.stream_task = hass.async_create_task(run())
+
+
+async def _async_process_quote(
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, tracker: InstrumentTracker, quote: Quote
+) -> None:
+    tracker.last_quote = quote
+    now = datetime.now(UTC)
+    events: list[DetectedEvent] = []
+
+    if quote.price is not None:
+        value = quote.price * 100 if tracker.ref.kind == "outcome" else quote.price
+        events += tracker.detectors.threshold.update(tracker.ref.symbol, tracker.ref.id, value)
+        events += tracker.detectors.move.update(tracker.ref.symbol, tracker.ref.id, value, now)
+
+        if tracker.detectors.daily_change is not None:
+            events += tracker.detectors.daily_change.update(
+                tracker.ref.symbol, tracker.ref.id, value, now, previous_close=quote.previous_close
+            )
+
+        if tracker.detectors.market_open_gap is not None:
+            state = calc_market_state(now)
+            events += tracker.detectors.market_open_gap.check(
+                tracker.ref.symbol, tracker.ref.id, value, quote.previous_close, state, now
+            )
+
+        if tracker.detectors.official_rate_published is not None:
+            events += tracker.detectors.official_rate_published.check(
+                tracker.ref.symbol, tracker.ref.id, value, published_date=(quote.ts or now).date()
+            )
+
+    events = tracker.cooldown.filter_events(events, now)
+    async_dispatcher_send(hass, f"{SIGNAL_QUOTE_UPDATE}_{tracker.subentry_id}", quote)
+    for event in events:
+        _fire_detected_event(hass, entry, tracker, event)
+
+
+async def _async_process_trade(
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, tracker: InstrumentTracker, trade: Trade
+) -> None:
+    tracker.last_trade = trade
+    async_dispatcher_send(hass, f"{SIGNAL_TRADE_UPDATE}_{tracker.subentry_id}", trade)
+
+    if tracker.detectors.large_trade is None:
+        return
+    now = datetime.now(UTC)
+    events = tracker.detectors.large_trade.check(tracker.ref.symbol, tracker.ref.id, trade.price, trade.size)
+    events = tracker.cooldown.filter_events(events, now)
+    for event in events:
+        _fire_detected_event(hass, entry, tracker, event)
+
+
+async def _async_process_provider_event(
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, tracker: InstrumentTracker, provider_event: ProviderEvent
+) -> None:
+    if provider_event.type != "resolved" or tracker.detectors.resolved is None:
+        return
+    now = datetime.now(UTC)
+    winning = bool(provider_event.data.get("winning"))
+    events = tracker.detectors.resolved.check(
+        tracker.ref.symbol, tracker.ref.id, True, tracker.ref.symbol if winning else None
+    )
+    events = tracker.cooldown.filter_events(events, now)
+    for event in events:
+        _fire_detected_event(hass, entry, tracker, event)
+
+
+async def _async_process_snapshot(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> None:
+    """Run every tracker's detectors against the latest REST snapshot poll.
+
+    Also the only place `volume_spike`/`closing_soon`/`resolved` (which need
+    Polymarket metadata, not a live quote) and are checked.
+    """
+    runtime = entry.runtime_data
+    quotes = runtime.snapshot_coordinator.data or {}
     now = datetime.now(UTC)
 
-    for outcome_tracker in tracker.outcomes.values():
+    for tracker in runtime.trackers.values():
+        quote = quotes.get(tracker.ref.id)
+        if quote is not None:
+            await _async_process_quote(hass, entry, tracker, quote)
+
+        market_slug = tracker.ref.extra.get("market_slug")
+        if not market_slug:
+            continue
+        metadata_coordinator = runtime.polymarket_metadata.get(market_slug)
+        if metadata_coordinator is None or metadata_coordinator.data is None:
+            continue
+        market = metadata_coordinator.data.market
+
         events: list[DetectedEvent] = []
-        events += tracker.volume_spike.update(outcome_tracker.outcome_name, outcome_tracker.token_id, market.volume_24hr)
-        if market.end_date is not None:
-            events += tracker.closing_soon.check(outcome_tracker.outcome_name, outcome_tracker.token_id, market.end_date, now)
-        if market.closed and market.uma_resolution_status == "resolved":
-            events += tracker.resolved.check(outcome_tracker.outcome_name, outcome_tracker.token_id, True, None)
+        if tracker.detectors.volume_spike is not None:
+            events += tracker.detectors.volume_spike.update(
+                tracker.ref.symbol, tracker.ref.id, market.volume_24hr
+            )
+        if tracker.detectors.closing_soon is not None and market.end_date is not None:
+            events += tracker.detectors.closing_soon.check(
+                tracker.ref.symbol, tracker.ref.id, market.end_date, now
+            )
+        if (
+            tracker.detectors.resolved is not None
+            and market.closed
+            and (market.uma_resolution_status or "").lower() == "resolved"
+        ):
+            events += tracker.detectors.resolved.check(tracker.ref.symbol, tracker.ref.id, True, None)
+
         events = tracker.cooldown.filter_events(events, now)
         for event in events:
-            _async_fire_detected_event(hass, entry, event)
+            _fire_detected_event(hass, entry, tracker, event)
 
 
-def _async_fire_detected_event(hass: HomeAssistant, entry: MarketSentryConfigEntry, event: DetectedEvent) -> None:
-    tracker = entry.runtime_data.tracker
+def _fire_detected_event(
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, tracker: InstrumentTracker, event: DetectedEvent
+) -> None:
     payload = {
         "entry_id": entry.entry_id,
-        "market_slug": tracker.market_slug,
-        "question": entry.title,
-        "outcome": event.outcome,
-        "token_id": event.token_id,
+        "subentry_id": tracker.subentry_id,
+        "provider": tracker.ref.provider,
+        "kind": tracker.ref.kind,
+        "symbol": tracker.ref.symbol,
+        "instrument_id": tracker.ref.id,
+        "unit": tracker.ref.unit,
+        "name": tracker.ref.name,
         "old": event.old,
         "new": event.new,
-        "delta_pp": event.delta_pp,
+        "delta": event.delta_pp,
         "direction": event.direction,
         "window_min": event.window_min,
-        "url": f"https://polymarket.com/market/{tracker.market_slug}",
+        "url": tracker.ref.url,
         **event.extra,
     }
-    hass.bus.async_fire(f"marketsentry_{event.event_type}", payload)
-    async_dispatcher_send(hass, f"{SIGNAL_DETECTED_EVENT}_{entry.entry_id}", event, payload)
+    hass.bus.async_fire(f"{BUS_EVENT_PREFIX}{event.event_type}", payload)
+    async_dispatcher_send(hass, f"{SIGNAL_DETECTED_EVENT}_{tracker.subentry_id}", event, payload)

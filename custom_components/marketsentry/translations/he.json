@@ -2,62 +2,115 @@
   "config": {
     "step": {
       "user": {
-        "title": "מעקב אחר שוק בפולימרקט",
-        "description": "הדביקו כתובת URL של פולימרקט (polymarket.com/event/... או /market/...) או slug בלבד.",
+        "title": "הוספת חשבון ספק",
+        "description": "בחרו איזה ספק נתוני שוק החשבון הזה יעקוב אחריו. פרטי התחברות (אם צריך) מוזנים פעם אחת; מכשירים נוספים אחר כך בלי להזין אותם מחדש.",
         "data": {
-          "url_or_slug": "כתובת URL או slug"
+          "provider": "ספק"
         }
       },
-      "confirm_market": {
-        "title": "אישור שוק",
-        "description": "לעקוב אחרי השוק הזה?\n\n**{question}**"
-      },
-      "select_markets": {
-        "title": "בחירת תת-שווקים למעקב",
-        "description": "לאירוע הזה יש כמה שווקים. בחרו אילו לעקוב אחריהם; כל אחד יהפוך למכשיר נפרד.",
+      "finnhub_credentials": {
+        "title": "מפתח API של Finnhub",
+        "description": "המסלול החינמי של Finnhub הוא לשימוש אישי, לא מסחרי. ניתן לקבל מפתח חינמי ב-finnhub.io.",
         "data": {
-          "markets": "שווקים"
+          "api_key": "מפתח API"
+        }
+      },
+      "alpaca_credentials": {
+        "title": "פרטי התחברות ל-Alpaca",
+        "description": "מסלול Basic חינמי: פיד IEX בלבד, לא הפיד המאוחד.",
+        "data": {
+          "key_id": "מזהה מפתח",
+          "secret_key": "מפתח סודי",
+          "feed": "פיד"
         }
       }
     },
     "error": {
-      "invalid_url": "לא הצלחנו לחלץ slug של אירוע/שוק מהקלט הזה.",
-      "not_found": "האירוע או השוק לא נמצאו בפולימרקט.",
-      "cannot_connect": "לא ניתן להתחבר ל-API של פולימרקט. נסו שוב מאוחר יותר.",
-      "no_markets_selected": "בחרו לפחות שוק אחד למעקב."
+      "invalid_auth": "פרטי התחברות שגויים.",
+      "cannot_connect": "לא ניתן להתחבר לספק. נסו שוב מאוחר יותר."
     },
     "abort": {
-      "already_configured": "השוק הזה כבר במעקב."
+      "already_configured": "חשבון הספק הזה כבר מוגדר."
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "הגדרות MarketSentry Pro",
-        "data": {
-          "thresholds": "ספי הסתברות (%, מופרדים בפסיקים)",
-          "hysteresis_pp": "היסטרזיס סף (נקודות אחוז)",
-          "move_delta_pp": "סף שינוי מחיר (נקודות אחוז)",
-          "move_window_min": "חלון זמן לשינוי מחיר (דקות)",
-          "large_trade_usd": "סף עסקה גדולה (דולר)",
-          "volume_spike_pct": "סף קפיצת מחזור 24 שעות (%)",
-          "closing_soon_hours": "סף \"נסגר בקרוב\" (שעות)",
-          "cooldown_min": "תקופת צינון לכל סוג התראה (דקות)"
+  "config_subentries": {
+    "instrument": {
+      "entry_type": "מכשיר",
+      "initiate_flow": {
+        "user": "הוספת מכשיר",
+        "reconfigure": "עריכת הגדרות מכשיר"
+      },
+      "step": {
+        "user": {
+          "title": "מעקב אחר מכשיר",
+          "description": "הדביקו כתובת URL/slug (פולימרקט), טיקר (מניות), או זוג כמו EUR/ILS (מטבע חוץ; הוסיפו /boi לשער היציג של בנק ישראל במקום שער השוק). טקסט חופשי גם עובד כחיפוש.",
+          "data": {
+            "url_or_query": "כתובת URL, טיקר, או זוג"
+          }
+        },
+        "select": {
+          "title": "כמה התאמות",
+          "description": "בחרו אחת. הריצו \"הוספת מכשיר\" שוב לכל השאר.",
+          "data": {
+            "instrument": "מכשיר"
+          }
+        },
+        "confirm": {
+          "title": "אישור והגדרת ספים",
+          "description": "מעקב אחרי **{name}** ({symbol}).",
+          "data": {
+            "thresholds": "ספים (מופרדים בפסיקים)",
+            "hysteresis": "היסטרזיס",
+            "move_delta": "סף שינוי מחיר",
+            "move_window_min": "חלון שינוי מחיר (דקות)",
+            "daily_change_pct": "סף שינוי יומי (%)",
+            "large_trade_usd": "סף עסקה גדולה (דולר)",
+            "volume_spike_pct": "סף קפיצת מחזור 24 שעות (%)",
+            "closing_soon_hours": "סף \"נסגר בקרוב\" (שעות)",
+            "market_open_gap_pct": "סף פער בפתיחת המסחר (%)",
+            "extended_hours": "מעקב אחר שעות מורחבות",
+            "cooldown_min": "תקופת צינון לכל סוג התראה (דקות)"
+          }
+        },
+        "reconfigure": {
+          "title": "עריכת הגדרות עבור {name}",
+          "data": {
+            "thresholds": "ספים (מופרדים בפסיקים)",
+            "hysteresis": "היסטרזיס",
+            "move_delta": "סף שינוי מחיר",
+            "move_window_min": "חלון שינוי מחיר (דקות)",
+            "daily_change_pct": "סף שינוי יומי (%)",
+            "large_trade_usd": "סף עסקה גדולה (דולר)",
+            "volume_spike_pct": "סף קפיצת מחזור 24 שעות (%)",
+            "closing_soon_hours": "סף \"נסגר בקרוב\" (שעות)",
+            "market_open_gap_pct": "סף פער בפתיחת המסחר (%)",
+            "extended_hours": "מעקב אחר שעות מורחבות",
+            "cooldown_min": "תקופת צינון לכל סוג התראה (דקות)"
+          }
         }
+      },
+      "error": {
+        "invalid_auth": "פרטי התחברות שגויים.",
+        "cannot_connect": "לא ניתן להתחבר לספק. נסו שוב מאוחר יותר.",
+        "not_found": "לא נמצאה התאמה."
+      },
+      "abort": {
+        "already_configured": "המכשיר הזה כבר במעקב תחת החשבון הזה.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
       }
     }
   },
   "issues": {
     "market_not_found": {
       "title": "שוק פולימרקט לא נמצא",
-      "description": "השוק '{slug}' שבמעקב לא נמצא בפולימרקט. ייתכן שהוסר או הועבר לארכיון. הסירו והוסיפו מחדש את האינטגרציה עם שוק תקין."
+      "description": "השוק '{slug}' שבמעקב לא נמצא בפולימרקט. ייתכן שהוסר או הועבר לארכיון. הסירו והוסיפו מחדש את המכשיר הרלוונטי עם שוק תקין."
     }
   },
   "entity": {
     "sensor": {
-      "probability": { "name": "הסתברות {outcome}" },
-      "last_trade_price": { "name": "מחיר עסקה אחרון {outcome}" },
-      "spread": { "name": "מרווח {outcome}" },
+      "probability": { "name": "הסתברות" },
+      "last_trade_price": { "name": "מחיר עסקה אחרון" },
+      "spread": { "name": "מרווח" },
       "volume_24hr": { "name": "מחזור 24 שעות" },
       "total_volume": { "name": "מחזור כולל" },
       "liquidity": { "name": "נזילות" },
@@ -72,12 +125,24 @@
           "closed": "סגור"
         }
       },
-      "winning_outcome": { "name": "תוצאה מנצחת" }
+      "winning_outcome": { "name": "תוצאה מנצחת" },
+      "price": { "name": "מחיר" },
+      "previous_close": { "name": "סגירה קודמת" },
+      "market_state": {
+        "name": "מצב שוק",
+        "state": {
+          "pre": "לפני פתיחה",
+          "regular": "פתוח",
+          "post": "אחרי שעות המסחר",
+          "closed": "סגור"
+        }
+      },
+      "rate": { "name": "שער" }
     },
     "binary_sensor": {
       "closed": { "name": "סגור" },
       "accepting_orders": { "name": "מקבל הזמנות" },
-      "ws_connected": { "name": "WebSocket מחובר" }
+      "stream_connected": { "name": "זרם מחובר" }
     },
     "event": {
       "detections": { "name": "התראות" }
@@ -85,36 +150,38 @@
   },
   "device_automation": {
     "trigger_type": {
-      "threshold_crossed": "הסתברות חצתה סף",
+      "threshold_crossed": "הערך חצה סף",
       "price_move": "שינוי מחיר מהיר",
+      "daily_change": "סף שינוי יומי",
       "large_trade": "התרחשה עסקה גדולה",
       "volume_spike": "קפיצת מחזור 24 שעות",
       "resolved": "השוק הוכרע",
-      "closing_soon": "נסגר בקרוב"
+      "closing_soon": "נסגר בקרוב",
+      "market_open_gap": "פער בפתיחת המסחר",
+      "official_rate_published": "פורסם שער רשמי חדש"
     }
   },
   "services": {
     "get_price_history": {
       "name": "קבלת היסטוריית מחירים",
-      "description": "שליפת נתוני מחיר היסטוריים לתוצאה אחת.",
+      "description": "שליפת נתוני מחיר היסטוריים למכשיר שבמעקב.",
       "fields": {
-        "device_id": { "name": "מכשיר", "description": "מכשיר השוק שבמעקב." },
-        "outcome": { "name": "תוצאה", "description": "שם התוצאה, לדוגמה Yes." },
-        "interval": { "name": "מרווח", "description": "מרווח ההיסטוריה." },
-        "fidelity": { "name": "דיוק", "description": "רזולוציה בדקות." }
+        "device_id": { "name": "מכשיר", "description": "מכשיר ה-HA של הפריט שבמעקב." },
+        "hours": { "name": "שעות", "description": "כמה שעות היסטוריה לשלוף." }
       }
     },
     "refresh": {
       "name": "רענון",
-      "description": "רענון מטא-דאטה כפוי לשוק שבמעקב.",
+      "description": "רענון מחיר כפוי לחשבון הספק של מכשיר שבמעקב.",
       "fields": {
-        "device_id": { "name": "מכשיר", "description": "מכשיר השוק שבמעקב." }
+        "device_id": { "name": "מכשיר", "description": "מכשיר ה-HA של הפריט שבמעקב." }
       }
     },
-    "search_markets": {
-      "name": "חיפוש שווקים",
-      "description": "חיפוש שווקים בפולימרקט לפי שאילתה.",
+    "search_instruments": {
+      "name": "חיפוש מכשירים",
+      "description": "חיפוש מכשירים בספק לפי שאילתה.",
       "fields": {
+        "provider": { "name": "ספק", "description": "באיזה ספק לחפש." },
         "query": { "name": "שאילתה", "description": "טקסט חיפוש." },
         "limit": { "name": "מגבלה", "description": "מספר תוצאות מקסימלי." }
       }

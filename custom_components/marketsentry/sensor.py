@@ -1,96 +1,105 @@
-"""Sensor platform for MarketSentry Pro."""
+"""Sensor platform for MarketSentry Pro, kind-conditional per instrument."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.const import PERCENTAGE, EntityCategory
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import SIGNAL_QUOTE_UPDATE, SIGNAL_TRADE, MarketSentryConfigEntry, OutcomeTracker
+from . import SIGNAL_QUOTE_UPDATE, SIGNAL_TRADE_UPDATE, InstrumentTracker, MarketSentryConfigEntry
 from .const import (
+    MARKET_STATE_CLOSED,
+    MARKET_STATE_POST,
+    MARKET_STATE_PRE,
+    MARKET_STATE_REGULAR,
     STATUS_CLOSED,
     STATUS_DISPUTED,
     STATUS_OPEN,
     STATUS_PROPOSED,
     STATUS_RESOLVED,
 )
-from .coordinator import PolymarketMetadataCoordinator
-from .entity import PolymarketEntity
-from .models import Quote, Trade
+from .coordinator import PolymarketMetadataCoordinator, ProviderSnapshotCoordinator
+from .entity import InstrumentEntity, instrument_device_info
+from .market_calendar import market_state as calc_market_state
+from .providers.base import Quote, Trade
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: MarketSentryConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: MarketSentryConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    tracker = entry.runtime_data.tracker
-    coordinator = tracker.coordinator
+    runtime = entry.runtime_data
+    coordinator = runtime.snapshot_coordinator
 
-    entities: list[SensorEntity] = []
-    for outcome_tracker in tracker.outcomes.values():
-        entities.append(
-            OutcomeProbabilitySensor(coordinator, tracker.market_slug, entry.title, outcome_tracker)
-        )
-        entities.append(
-            OutcomeLastTradePriceSensor(coordinator, tracker.market_slug, entry.title, outcome_tracker)
-        )
-        entities.append(
-            OutcomeSpreadSensor(coordinator, tracker.market_slug, entry.title, outcome_tracker)
-        )
+    for subentry_id, tracker in runtime.trackers.items():
+        entities: list[SensorEntity] = []
+        kind = tracker.ref.kind
 
-    entities.append(Volume24hrSensor(coordinator, tracker.market_slug, entry.title))
-    entities.append(TotalVolumeSensor(coordinator, tracker.market_slug, entry.title))
-    entities.append(LiquiditySensor(coordinator, tracker.market_slug, entry.title))
-    entities.append(EndDateSensor(coordinator, tracker.market_slug, entry.title))
-    entities.append(ResolutionStatusSensor(coordinator, tracker.market_slug, entry.title))
-    entities.append(WinningOutcomeSensor(coordinator, tracker.market_slug, entry.title))
+        if kind == "outcome":
+            entities.append(ProbabilitySensor(coordinator, entry.entry_id, tracker))
+            entities.append(LastTradePriceSensor(coordinator, entry.entry_id, tracker))
+            entities.append(SpreadSensor(coordinator, entry.entry_id, tracker))
 
-    async_add_entities(entities)
+            market_slug = tracker.ref.extra.get("market_slug")
+            metadata_coordinator = (
+                runtime.polymarket_metadata.get(market_slug) if market_slug else None
+            )
+            if metadata_coordinator is not None:
+                entities.extend(
+                    [
+                        Volume24hrSensor(metadata_coordinator, entry.entry_id, tracker),
+                        TotalVolumeSensor(metadata_coordinator, entry.entry_id, tracker),
+                        LiquiditySensor(metadata_coordinator, entry.entry_id, tracker),
+                        EndDateSensor(metadata_coordinator, entry.entry_id, tracker),
+                        ResolutionStatusSensor(metadata_coordinator, entry.entry_id, tracker),
+                        WinningOutcomeSensor(metadata_coordinator, entry.entry_id, tracker),
+                    ]
+                )
+        elif kind == "stock":
+            entities.append(PriceSensor(coordinator, entry.entry_id, tracker))
+            entities.append(PreviousCloseSensor(coordinator, entry.entry_id, tracker))
+            entities.append(MarketStateSensor(coordinator, entry.entry_id, tracker))
+        else:  # fx
+            entities.append(RateSensor(coordinator, entry.entry_id, tracker))
+
+        async_add_entities(entities, config_subentry_id=subentry_id)
 
 
-class OutcomeProbabilitySensor(PolymarketEntity, SensorEntity):
-    """Live probability (midpoint) for one outcome, in percent."""
+class ProbabilitySensor(InstrumentEntity, SensorEntity):
+    """Live probability (midpoint) for one Polymarket outcome, in percent."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = "%"
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "probability"
     _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread"})
 
-    def __init__(
-        self,
-        coordinator: PolymarketMetadataCoordinator,
-        market_slug: str,
-        question: str,
-        outcome_tracker: OutcomeTracker,
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._outcome_tracker = outcome_tracker
-        self._attr_unique_id = f"{market_slug}_{outcome_tracker.token_id}_probability"
-        self._attr_translation_key = "probability"
-        self._attr_translation_placeholders = {"outcome": outcome_tracker.outcome_name}
-        self._attr_name = f"{outcome_tracker.outcome_name} probability"
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_probability"
 
     @property
     def native_value(self) -> float | None:
-        mid = self._outcome_tracker.quote.midpoint
-        return round(mid * 100, 1) if mid is not None else None
+        price = self._tracker.last_quote.price
+        return round(price * 100, 1) if price is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        quote: Quote = self._outcome_tracker.quote
+        quote = self._tracker.last_quote
         spread = None
-        if quote.best_bid is not None and quote.best_ask is not None:
-            spread = round((quote.best_ask - quote.best_bid) * 100, 2)
+        if quote.bid is not None and quote.ask is not None:
+            spread = round((quote.ask - quote.bid) * 100, 2)
         return {
-            "token_id": quote.token_id,
-            "best_bid": quote.best_bid,
-            "best_ask": quote.best_ask,
+            "best_bid": quote.bid,
+            "best_ask": quote.ask,
             "spread": spread,
-            "last_update": quote.timestamp.isoformat() if quote.timestamp else None,
+            "last_update": quote.ts.isoformat() if quote.ts else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -98,98 +107,79 @@ class OutcomeProbabilitySensor(PolymarketEntity, SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                f"{SIGNAL_QUOTE_UPDATE}_{self._outcome_tracker.token_id}",
+                f"{SIGNAL_QUOTE_UPDATE}_{self._tracker.subentry_id}",
                 self._handle_quote_update,
             )
         )
 
     @callback
     def _handle_quote_update(self, quote: Quote) -> None:
-        mid = quote.midpoint
-        new_value = round(mid * 100, 1) if mid is not None else None
+        new_value = round(quote.price * 100, 1) if quote.price is not None else None
         if self._should_write_throttled(new_value):
             self.async_write_ha_state()
 
 
-class OutcomeLastTradePriceSensor(PolymarketEntity, SensorEntity):
-    """Last traded price for one outcome, in percent."""
+class LastTradePriceSensor(InstrumentEntity, SensorEntity):
+    """Last traded price for one Polymarket outcome, in percent."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = "%"
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_entity_registry_enabled_default = True
+    _attr_translation_key = "last_trade_price"
 
-    def __init__(
-        self,
-        coordinator: PolymarketMetadataCoordinator,
-        market_slug: str,
-        question: str,
-        outcome_tracker: OutcomeTracker,
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._outcome_tracker = outcome_tracker
-        self._attr_unique_id = f"{market_slug}_{outcome_tracker.token_id}_last_trade_price"
-        self._attr_translation_key = "last_trade_price"
-        self._attr_translation_placeholders = {"outcome": outcome_tracker.outcome_name}
-        self._attr_name = f"{outcome_tracker.outcome_name} last trade price"
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_last_trade_price"
 
     @property
     def native_value(self) -> float | None:
-        price = self._outcome_tracker.quote.last_trade_price
-        return round(price * 100, 1) if price is not None else None
+        trade = self._tracker.last_trade
+        return round(trade.price * 100, 1) if trade is not None else None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                f"{SIGNAL_TRADE}_{self._outcome_tracker.token_id}",
+                f"{SIGNAL_TRADE_UPDATE}_{self._tracker.subentry_id}",
                 self._handle_trade,
             )
         )
 
     @callback
     def _handle_trade(self, trade: Trade) -> None:
-        new_value = round(trade.price * 100, 1)
-        if self._should_write_throttled(new_value):
+        if self._should_write_throttled(round(trade.price * 100, 1)):
             self.async_write_ha_state()
 
 
-class OutcomeSpreadSensor(PolymarketEntity, SensorEntity):
-    """Bid/ask spread for one outcome, in percentage points. Diagnostic."""
+class SpreadSensor(InstrumentEntity, SensorEntity):
+    """Bid/ask spread for one Polymarket outcome, in percentage points. Diagnostic."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = "%"
     _attr_suggested_display_precision = 2
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "spread"
 
-    def __init__(
-        self,
-        coordinator: PolymarketMetadataCoordinator,
-        market_slug: str,
-        question: str,
-        outcome_tracker: OutcomeTracker,
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._outcome_tracker = outcome_tracker
-        self._attr_unique_id = f"{market_slug}_{outcome_tracker.token_id}_spread"
-        self._attr_translation_key = "spread"
-        self._attr_translation_placeholders = {"outcome": outcome_tracker.outcome_name}
-        self._attr_name = f"{outcome_tracker.outcome_name} spread"
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_spread"
 
     @property
     def native_value(self) -> float | None:
-        quote = self._outcome_tracker.quote
-        if quote.best_bid is None or quote.best_ask is None:
+        quote = self._tracker.last_quote
+        if quote.bid is None or quote.ask is None:
             return None
-        return round((quote.best_ask - quote.best_bid) * 100, 2)
+        return round((quote.ask - quote.bid) * 100, 2)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                f"{SIGNAL_QUOTE_UPDATE}_{self._outcome_tracker.token_id}",
+                f"{SIGNAL_QUOTE_UPDATE}_{self._tracker.subentry_id}",
                 self._handle_quote_update,
             )
         )
@@ -200,13 +190,128 @@ class OutcomeSpreadSensor(PolymarketEntity, SensorEntity):
             self.async_write_ha_state()
 
 
-class _MetadataSensor(PolymarketEntity, SensorEntity):
-    """Base for sensors sourced purely from the Gamma metadata coordinator."""
+class PriceSensor(InstrumentEntity, SensorEntity):
+    """Live price for one stock, in its quote currency (USD)."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "price"
+
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_price"
+        self._attr_native_unit_of_measurement = tracker.ref.unit
+
+    @property
+    def native_value(self) -> float | None:
+        return self._tracker.last_quote.price
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{SIGNAL_QUOTE_UPDATE}_{self._tracker.subentry_id}",
+                self._handle_quote_update,
+            )
+        )
+
+    @callback
+    def _handle_quote_update(self, quote: Quote) -> None:
+        if self._should_write_throttled(quote.price):
+            self.async_write_ha_state()
+
+
+class PreviousCloseSensor(InstrumentEntity, SensorEntity):
+    """Previous session's close price for one stock."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "previous_close"
+
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_previous_close"
+        self._attr_native_unit_of_measurement = tracker.ref.unit
+
+    @property
+    def native_value(self) -> float | None:
+        return self._tracker.last_quote.previous_close
+
+
+class MarketStateSensor(InstrumentEntity, SensorEntity):
+    """NYSE/NASDAQ session state for one stock: pre/regular/post/closed."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [MARKET_STATE_PRE, MARKET_STATE_REGULAR, MARKET_STATE_POST, MARKET_STATE_CLOSED]
+    _attr_translation_key = "market_state"
+
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_market_state"
+
+    @property
+    def native_value(self) -> str:
+        return calc_market_state(datetime.now(UTC))
+
+
+class RateSensor(InstrumentEntity, SensorEntity):
+    """Live exchange rate for one FX pair, in the quote currency."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 4
+    _attr_translation_key = "rate"
+
+    def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker.ref)
+        self._tracker = tracker
+        self._attr_unique_id = f"{tracker.subentry_id}_rate"
+        self._attr_native_unit_of_measurement = tracker.ref.unit
+
+    @property
+    def native_value(self) -> float | None:
+        return self._tracker.last_quote.price
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        source, _base, _quote = self._tracker.ref.id.split(":")
+        quote = self._tracker.last_quote
+        return {
+            "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
+            "published_date": quote.ts.date().isoformat() if quote.ts else None,
+        }
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{SIGNAL_QUOTE_UPDATE}_{self._tracker.subentry_id}",
+                self._handle_quote_update,
+            )
+        )
+
+    @callback
+    def _handle_quote_update(self, quote: Quote) -> None:
+        if self._should_write_throttled(quote.price):
+            self.async_write_ha_state()
+
+
+class _MetadataSensor(CoordinatorEntity[PolymarketMetadataCoordinator], SensorEntity):
+    """Base for sensors sourced from Polymarket's Gamma market metadata."""
+
+    _attr_has_entity_name = True
 
     def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
+        self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker
     ) -> None:
-        super().__init__(coordinator, market_slug, question)
+        super().__init__(coordinator)
+        self._tracker = tracker
+        self._attr_device_info = instrument_device_info(entry_id, tracker.ref)
 
 
 class Volume24hrSensor(_MetadataSensor):
@@ -215,11 +320,9 @@ class Volume24hrSensor(_MetadataSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "volume_24hr"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_volume_24hr"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_volume_24hr"
 
     @property
     def native_value(self) -> float | None:
@@ -232,11 +335,9 @@ class TotalVolumeSensor(_MetadataSensor):
     _attr_state_class = SensorStateClass.TOTAL
     _attr_translation_key = "total_volume"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_total_volume"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_total_volume"
 
     @property
     def native_value(self) -> float | None:
@@ -249,11 +350,9 @@ class LiquiditySensor(_MetadataSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "liquidity"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_liquidity"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_liquidity"
 
     @property
     def native_value(self) -> float | None:
@@ -264,11 +363,9 @@ class EndDateSensor(_MetadataSensor):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_translation_key = "end_date"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_end_date"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_end_date"
 
     @property
     def native_value(self) -> datetime | None:
@@ -280,11 +377,9 @@ class ResolutionStatusSensor(_MetadataSensor):
     _attr_options = [STATUS_OPEN, STATUS_PROPOSED, STATUS_DISPUTED, STATUS_RESOLVED, STATUS_CLOSED]
     _attr_translation_key = "resolution_status"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_resolution_status"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_resolution_status"
 
     @property
     def native_value(self) -> str | None:
@@ -294,19 +389,15 @@ class ResolutionStatusSensor(_MetadataSensor):
         status = (market.uma_resolution_status or "").lower()
         if status in (STATUS_PROPOSED, STATUS_DISPUTED, STATUS_RESOLVED):
             return status
-        if market.closed:
-            return STATUS_CLOSED
-        return STATUS_OPEN
+        return STATUS_CLOSED if market.closed else STATUS_OPEN
 
 
 class WinningOutcomeSensor(_MetadataSensor):
     _attr_translation_key = "winning_outcome"
 
-    def __init__(
-        self, coordinator: PolymarketMetadataCoordinator, market_slug: str, question: str
-    ) -> None:
-        super().__init__(coordinator, market_slug, question)
-        self._attr_unique_id = f"{market_slug}_winning_outcome"
+    def __init__(self, coordinator: PolymarketMetadataCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
+        super().__init__(coordinator, entry_id, tracker)
+        self._attr_unique_id = f"{tracker.subentry_id}_winning_outcome"
 
     @property
     def native_value(self) -> str | None:

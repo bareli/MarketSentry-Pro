@@ -2,62 +2,115 @@
   "config": {
     "step": {
       "user": {
-        "title": "Track a Polymarket market",
-        "description": "Paste a Polymarket URL (polymarket.com/event/... or /market/...) or a bare slug.",
+        "title": "Add a provider account",
+        "description": "Choose which market data provider this account tracks. Credentials (if needed) are entered once; instruments are added afterward without re-entering them.",
         "data": {
-          "url_or_slug": "URL or slug"
+          "provider": "Provider"
         }
       },
-      "confirm_market": {
-        "title": "Confirm market",
-        "description": "Track this market?\n\n**{question}**"
-      },
-      "select_markets": {
-        "title": "Select sub-markets to track",
-        "description": "This event has multiple markets. Pick which ones to track; each becomes its own device.",
+      "finnhub_credentials": {
+        "title": "Finnhub API key",
+        "description": "Finnhub's free tier is personal, non-commercial use only. Get a free key at finnhub.io.",
         "data": {
-          "markets": "Markets"
+          "api_key": "API key"
+        }
+      },
+      "alpaca_credentials": {
+        "title": "Alpaca API credentials",
+        "description": "Free Basic plan: IEX feed only, not the consolidated tape.",
+        "data": {
+          "key_id": "Key ID",
+          "secret_key": "Secret key",
+          "feed": "Feed"
         }
       }
     },
     "error": {
-      "invalid_url": "Could not parse a Polymarket event/market slug from that input.",
-      "not_found": "That event or market could not be found on Polymarket.",
-      "cannot_connect": "Could not reach the Polymarket API. Try again later.",
-      "no_markets_selected": "Select at least one market to track."
+      "invalid_auth": "Invalid credentials.",
+      "cannot_connect": "Could not reach the provider. Try again later."
     },
     "abort": {
-      "already_configured": "This market is already being tracked."
+      "already_configured": "This provider account is already configured."
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "MarketSentry Pro options",
-        "data": {
-          "thresholds": "Probability thresholds (%, comma-separated)",
-          "hysteresis_pp": "Threshold hysteresis (percentage points)",
-          "move_delta_pp": "Price move trigger (percentage points)",
-          "move_window_min": "Price move window (minutes)",
-          "large_trade_usd": "Large trade threshold (USD)",
-          "volume_spike_pct": "24h volume spike threshold (%)",
-          "closing_soon_hours": "Closing soon threshold (hours)",
-          "cooldown_min": "Cooldown per event type (minutes)"
+  "config_subentries": {
+    "instrument": {
+      "entry_type": "Instrument",
+      "initiate_flow": {
+        "user": "Add instrument",
+        "reconfigure": "Edit instrument options"
+      },
+      "step": {
+        "user": {
+          "title": "Track an instrument",
+          "description": "Paste a URL/slug (Polymarket), ticker (stocks), or pair like EUR/ILS (FX; add /boi for the Bank of Israel official rate instead of the market rate). Free text also works as a search.",
+          "data": {
+            "url_or_query": "URL, ticker, or pair"
+          }
+        },
+        "select": {
+          "title": "Multiple matches",
+          "description": "Pick one. Run \"Add instrument\" again for any others.",
+          "data": {
+            "instrument": "Instrument"
+          }
+        },
+        "confirm": {
+          "title": "Confirm and set thresholds",
+          "description": "Tracking **{name}** ({symbol}).",
+          "data": {
+            "thresholds": "Thresholds (comma-separated)",
+            "hysteresis": "Hysteresis",
+            "move_delta": "Price move trigger",
+            "move_window_min": "Price move window (minutes)",
+            "daily_change_pct": "Daily change trigger (%)",
+            "large_trade_usd": "Large trade threshold (USD)",
+            "volume_spike_pct": "24h volume spike threshold (%)",
+            "closing_soon_hours": "Closing soon threshold (hours)",
+            "market_open_gap_pct": "Market-open gap threshold (%)",
+            "extended_hours": "Track extended hours",
+            "cooldown_min": "Cooldown per event type (minutes)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit options for {name}",
+          "data": {
+            "thresholds": "Thresholds (comma-separated)",
+            "hysteresis": "Hysteresis",
+            "move_delta": "Price move trigger",
+            "move_window_min": "Price move window (minutes)",
+            "daily_change_pct": "Daily change trigger (%)",
+            "large_trade_usd": "Large trade threshold (USD)",
+            "volume_spike_pct": "24h volume spike threshold (%)",
+            "closing_soon_hours": "Closing soon threshold (hours)",
+            "market_open_gap_pct": "Market-open gap threshold (%)",
+            "extended_hours": "Track extended hours",
+            "cooldown_min": "Cooldown per event type (minutes)"
+          }
         }
+      },
+      "error": {
+        "invalid_auth": "Invalid credentials.",
+        "cannot_connect": "Could not reach the provider. Try again later.",
+        "not_found": "No match found."
+      },
+      "abort": {
+        "already_configured": "This instrument is already tracked under this account.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
       }
     }
   },
   "issues": {
     "market_not_found": {
       "title": "Polymarket market not found",
-      "description": "The tracked market '{slug}' could not be found on Polymarket. It may have been removed or archived. Remove and re-add this integration with a valid market."
+      "description": "The tracked market '{slug}' could not be found on Polymarket. It may have been removed or archived. Remove and re-add the affected instrument with a valid market."
     }
   },
   "entity": {
     "sensor": {
-      "probability": { "name": "{outcome} probability" },
-      "last_trade_price": { "name": "{outcome} last trade price" },
-      "spread": { "name": "{outcome} spread" },
+      "probability": { "name": "Probability" },
+      "last_trade_price": { "name": "Last trade price" },
+      "spread": { "name": "Spread" },
       "volume_24hr": { "name": "24h volume" },
       "total_volume": { "name": "Total volume" },
       "liquidity": { "name": "Liquidity" },
@@ -72,12 +125,24 @@
           "closed": "Closed"
         }
       },
-      "winning_outcome": { "name": "Winning outcome" }
+      "winning_outcome": { "name": "Winning outcome" },
+      "price": { "name": "Price" },
+      "previous_close": { "name": "Previous close" },
+      "market_state": {
+        "name": "Market state",
+        "state": {
+          "pre": "Pre-market",
+          "regular": "Open",
+          "post": "After-hours",
+          "closed": "Closed"
+        }
+      },
+      "rate": { "name": "Rate" }
     },
     "binary_sensor": {
       "closed": { "name": "Closed" },
       "accepting_orders": { "name": "Accepting orders" },
-      "ws_connected": { "name": "WebSocket connected" }
+      "stream_connected": { "name": "Stream connected" }
     },
     "event": {
       "detections": { "name": "Detections" }
@@ -85,36 +150,38 @@
   },
   "device_automation": {
     "trigger_type": {
-      "threshold_crossed": "Probability crossed a threshold",
+      "threshold_crossed": "Value crossed a threshold",
       "price_move": "Fast price move",
+      "daily_change": "Daily change threshold",
       "large_trade": "Large trade occurred",
       "volume_spike": "24h volume spike",
       "resolved": "Market resolved",
-      "closing_soon": "Closing soon"
+      "closing_soon": "Closing soon",
+      "market_open_gap": "Market-open gap",
+      "official_rate_published": "New official rate published"
     }
   },
   "services": {
     "get_price_history": {
       "name": "Get price history",
-      "description": "Fetch historical price points for one outcome.",
+      "description": "Fetch historical price points for one tracked instrument.",
       "fields": {
-        "device_id": { "name": "Device", "description": "The tracked market device." },
-        "outcome": { "name": "Outcome", "description": "Outcome name, e.g. Yes." },
-        "interval": { "name": "Interval", "description": "History interval." },
-        "fidelity": { "name": "Fidelity", "description": "Resolution in minutes." }
+        "device_id": { "name": "Device", "description": "The tracked instrument's device." },
+        "hours": { "name": "Hours", "description": "How many hours of history to fetch." }
       }
     },
     "refresh": {
       "name": "Refresh",
-      "description": "Force a metadata refresh for a tracked market.",
+      "description": "Force an immediate price refresh for a tracked instrument's provider account.",
       "fields": {
-        "device_id": { "name": "Device", "description": "The tracked market device." }
+        "device_id": { "name": "Device", "description": "The tracked instrument's device." }
       }
     },
-    "search_markets": {
-      "name": "Search markets",
-      "description": "Search Polymarket for markets matching a query.",
+    "search_instruments": {
+      "name": "Search instruments",
+      "description": "Search a provider for instruments matching a query.",
       "fields": {
+        "provider": { "name": "Provider", "description": "Which provider to search." },
         "query": { "name": "Query", "description": "Search text." },
         "limit": { "name": "Limit", "description": "Maximum results." }
       }
