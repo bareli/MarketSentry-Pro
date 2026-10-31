@@ -11,12 +11,19 @@ from __future__ import annotations
 
 import custom_components.marketsentry as msp
 from custom_components.marketsentry.const import default_options_for_kind
+from custom_components.marketsentry.providers.base import InstrumentRef
+
+
+def _ref(kind: str, instrument_id: str) -> InstrumentRef:
+    return InstrumentRef(
+        provider="test", id=instrument_id, symbol="X", name="X", kind=kind, unit="USD"
+    )
 
 
 def test_build_detectors_crypto_matches_its_default_options() -> None:
     """DET-09: crypto gets exactly threshold/move/daily_change, nothing else -
     matching default_options_for_kind("crypto") and EVENT_TYPES_BY_KIND["crypto"]."""
-    detectors = msp._build_detectors("crypto", default_options_for_kind("crypto"))
+    detectors = msp._build_detectors(_ref("crypto", "bitcoin"), default_options_for_kind("crypto"))
 
     assert detectors.threshold is not None
     assert detectors.move is not None
@@ -29,21 +36,22 @@ def test_build_detectors_crypto_matches_its_default_options() -> None:
     assert detectors.official_rate_published is None
 
 
-def test_build_detectors_fx_wires_official_rate_published_for_every_fx_instrument() -> None:
-    """DET-07 regression: `_build_detectors` takes only `kind` (never the ref/id), so it
-    cannot distinguish a Frankfurter-sourced fx instrument (id "frankfurter:EUR:ILS") from a
-    Bank-of-Israel-sourced one (id "boi:EUR:ILS") - every fx instrument gets an
-    OfficialRatePublishedDetector wired, even though "official rate published" is documented
-    (README, qa/plans/DET-detectors.md DET-07) as a Bank-of-Israel-only concept. See BUG-005:
-    `__init__.py`'s `_async_process_quote` also calls this detector unconditionally for every fx
-    tracker regardless of `tracker.ref.id`'s source prefix, so a Frankfurter instrument's quote
-    (whose `Quote.ts` changes date once a day, same as BOI's) will fire the
-    `marketsentry_official_rate_published` bus event too."""
+def test_build_detectors_fx_wires_official_rate_published_only_for_boi_refs() -> None:
+    """BUG-005 regression: "official rate published" is a Bank-of-Israel-only concept
+    (README, qa/plans/DET-detectors.md DET-07). `_build_detectors` now takes the full
+    `InstrumentRef` (not just the kind) so it can tell a Frankfurter-sourced fx instrument
+    (id "frankfurter:EUR:ILS") apart from a Bank-of-Israel-sourced one (id "boi:EUR:ILS") -
+    only the latter should get an OfficialRatePublishedDetector wired. Before the fix, every
+    fx ref got one unconditionally regardless of source."""
     fx_opts = default_options_for_kind("fx")
 
-    detectors = msp._build_detectors("fx", fx_opts)
+    boi_detectors = msp._build_detectors(_ref("fx", "boi:EUR:ILS"), fx_opts)
+    frankfurter_detectors = msp._build_detectors(_ref("fx", "frankfurter:EUR:ILS"), fx_opts)
 
-    assert detectors.official_rate_published is not None, (
-        "fx gets this detector unconditionally - _build_detectors has no way to wire it "
-        "only for boi-sourced refs, since it never receives the InstrumentRef/id at all"
+    assert boi_detectors.official_rate_published is not None, (
+        "a boi:-sourced fx ref must get the official_rate_published detector wired"
+    )
+    assert frankfurter_detectors.official_rate_published is None, (
+        "a frankfurter:-sourced fx ref must NOT get the official_rate_published detector wired - "
+        "it is a Bank-of-Israel-only concept"
     )

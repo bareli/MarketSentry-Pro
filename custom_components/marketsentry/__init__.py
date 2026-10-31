@@ -141,7 +141,8 @@ def _ref_from_subentry_data(provider_key: str, data: Mapping[str, Any]) -> Instr
     )
 
 
-def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
+def _build_detectors(ref: InstrumentRef, opts: dict[str, Any]) -> InstrumentDetectors:
+    kind = ref.kind
     detectors = InstrumentDetectors(
         threshold=ThresholdDetector(opts.get(OPT_THRESHOLDS, []), opts.get(OPT_HYSTERESIS, 0.0)),
         move=PriceMoveDetector(
@@ -160,7 +161,11 @@ def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
         detectors.resolved = ResolvedDetector()
     if kind == "stock" and OPT_MARKET_OPEN_GAP_PCT in opts:
         detectors.market_open_gap = MarketOpenGapDetector(opts[OPT_MARKET_OPEN_GAP_PCT])
-    if kind == "fx":
+    if kind == "fx" and ref.id.startswith("boi:"):
+        # "official rate published" is a Bank-of-Israel-only concept (README,
+        # DET-07): a Frankfurter-sourced fx ref ("frankfurter:<base>:<quote>")
+        # must never get this detector wired - see BUG-005. The ref (not just
+        # the kind) is now threaded in specifically so this can be decided.
         detectors.official_rate_published = OfficialRatePublishedDetector()
     return detectors
 
@@ -213,7 +218,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry)
             subentry_id=subentry_id,
             ref=ref,
             options=opts,
-            detectors=_build_detectors(ref.kind, opts),
+            detectors=_build_detectors(ref, opts),
             cooldown=CooldownGate(opts.get(OPT_COOLDOWN_MIN, 15)),
         )
 
