@@ -1,0 +1,124 @@
+import { describe, expect, it } from "vitest";
+import { buildRows, changeFromHistory } from "../src/rows.js";
+
+function mockHass() {
+  return {
+    entities: {
+      "sensor.yes_probability": {
+        entity_id: "sensor.yes_probability",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "probability",
+      },
+      "sensor.yes_resolution_status": {
+        entity_id: "sensor.yes_resolution_status",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "resolution_status",
+      },
+      "binary_sensor.yes_closed": {
+        entity_id: "binary_sensor.yes_closed",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "closed",
+      },
+      "sensor.aapl_price": {
+        entity_id: "sensor.aapl_price",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "price",
+      },
+      "sensor.aapl_market_state": {
+        entity_id: "sensor.aapl_market_state",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "market_state",
+      },
+      "sensor.unrelated": {
+        entity_id: "sensor.unrelated",
+        platform: "other_integration",
+        device_id: "dev3",
+        translation_key: "something",
+      },
+    },
+    devices: {
+      dev1: { id: "dev1", name: "Will X happen?: Yes", name_by_user: null },
+      dev2: { id: "dev2", name: "AAPL Inc", name_by_user: null },
+    },
+    states: {
+      "sensor.yes_probability": {
+        state: "62.3",
+        attributes: { kind: "outcome", provider: "polymarket", url: "https://polymarket.com/market/x" },
+      },
+      "sensor.yes_resolution_status": { state: "open", attributes: {} },
+      "binary_sensor.yes_closed": { state: "off", attributes: {} },
+      "sensor.aapl_price": {
+        state: "150.5",
+        attributes: { kind: "stock", provider: "finnhub", unit_of_measurement: "USD" },
+      },
+      "sensor.aapl_market_state": { state: "regular", attributes: {} },
+    },
+  };
+}
+
+describe("buildRows", () => {
+  it("returns one row per primary entity, enriched from sibling entities", () => {
+    const rows = buildRows(mockHass());
+    expect(rows).toHaveLength(2);
+
+    const outcome = rows.find((r) => r.kind === "outcome");
+    expect(outcome.name).toBe("Will X happen?: Yes");
+    expect(outcome.value).toBeCloseTo(62.3);
+    expect(outcome.resolutionStatus).toBe("open");
+    expect(outcome.closed).toBe(false);
+    expect(outcome.url).toBe("https://polymarket.com/market/x");
+
+    const stock = rows.find((r) => r.kind === "stock");
+    expect(stock.name).toBe("AAPL Inc");
+    expect(stock.value).toBeCloseTo(150.5);
+    expect(stock.marketState).toBe("regular");
+    expect(stock.unit).toBe("USD");
+  });
+
+  it("ignores entities from other integrations", () => {
+    const rows = buildRows(mockHass());
+    expect(rows.some((r) => r.entityId === "sensor.unrelated")).toBe(false);
+  });
+
+  it("returns an empty array when hass is missing required registries", () => {
+    expect(buildRows(null)).toEqual([]);
+    expect(buildRows({})).toEqual([]);
+  });
+
+  it("treats unknown/unavailable state as a null value", () => {
+    const hass = mockHass();
+    hass.states["sensor.yes_probability"].state = "unavailable";
+    const rows = buildRows(hass);
+    expect(rows.find((r) => r.kind === "outcome").value).toBeNull();
+  });
+});
+
+describe("changeFromHistory", () => {
+  it("computes delta and percent change from first to last point", () => {
+    const { changePct, deltaPp } = changeFromHistory([
+      { t: "1", p: 100 },
+      { t: "2", p: 103 },
+    ]);
+    expect(deltaPp).toBeCloseTo(3);
+    expect(changePct).toBeCloseTo(3);
+  });
+
+  it("returns nulls for fewer than 2 points", () => {
+    expect(changeFromHistory([])).toEqual({ changePct: null, deltaPp: null });
+    expect(changeFromHistory([{ t: "1", p: 1 }])).toEqual({ changePct: null, deltaPp: null });
+  });
+
+  it("handles a zero starting price without dividing by zero", () => {
+    const { changePct, deltaPp } = changeFromHistory([
+      { t: "1", p: 0 },
+      { t: "2", p: 5 },
+    ]);
+    expect(deltaPp).toBe(5);
+    expect(changePct).toBeNull();
+  });
+});

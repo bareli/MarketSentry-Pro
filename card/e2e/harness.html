@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>marketsentry-card harness</title>
+<style>
+  :root {
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --card-background-color: #fff;
+    --secondary-background-color: #f0f0f0;
+    --divider-color: #e0e0e0;
+    --primary-color: #03a9f4;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #f44336;
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #a0a0a0;
+    --card-background-color: #1c1c1c;
+    --secondary-background-color: #2a2a2a;
+    --divider-color: #383838;
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--card-background-color);
+    font-family: Roboto, Arial, sans-serif;
+  }
+  ha-card {
+    display: block;
+    background: var(--card-background-color);
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    max-width: 480px;
+  }
+  marketsentry-card { display: block; }
+</style>
+</head>
+<body>
+<marketsentry-card id="card"></marketsentry-card>
+<script type="module">
+  import "../../custom_components/marketsentry/www/marketsentry-card.js";
+
+  const params = new URLSearchParams(location.search);
+  if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+  if (params.get("dir") === "rtl") document.documentElement.dir = "rtl";
+
+  const now = Date.now();
+  const history = Array.from({ length: 12 }, (_, i) => ({
+    t: new Date(now - (11 - i) * 5 * 60_000).toISOString(),
+    p: 50 + Math.sin(i / 2) * 8 + i * 0.6,
+  }));
+
+  const mockHass = {
+    language: document.documentElement.lang,
+    entities: {
+      "sensor.yes_probability": {
+        entity_id: "sensor.yes_probability",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "probability",
+      },
+      "sensor.yes_resolution_status": {
+        entity_id: "sensor.yes_resolution_status",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "resolution_status",
+      },
+      "binary_sensor.yes_closed": {
+        entity_id: "binary_sensor.yes_closed",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "closed",
+      },
+      "sensor.aapl_price": {
+        entity_id: "sensor.aapl_price",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "price",
+      },
+      "sensor.aapl_market_state": {
+        entity_id: "sensor.aapl_market_state",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "market_state",
+      },
+      "sensor.eur_ils_rate": {
+        entity_id: "sensor.eur_ils_rate",
+        platform: "marketsentry",
+        device_id: "dev3",
+        translation_key: "rate",
+      },
+    },
+    devices: {
+      dev1: { id: "dev1", name: "Will the election happen?: Yes", name_by_user: null },
+      dev2: { id: "dev2", name: "AAPL Inc", name_by_user: null },
+      dev3: { id: "dev3", name: "EUR/ILS (market rate)", name_by_user: null },
+    },
+    states: {
+      "sensor.yes_probability": {
+        state: "62.3",
+        attributes: {
+          kind: "outcome",
+          provider: "polymarket",
+          url: "https://polymarket.com/market/will-the-election-happen",
+        },
+      },
+      "sensor.yes_resolution_status": { state: "open", attributes: {} },
+      "binary_sensor.yes_closed": { state: "off", attributes: {} },
+      "sensor.aapl_price": {
+        state: "150.52",
+        attributes: { kind: "stock", provider: "finnhub", unit_of_measurement: "USD" },
+      },
+      "sensor.aapl_market_state": { state: "regular", attributes: {} },
+      "sensor.eur_ils_rate": {
+        state: "3.9123",
+        attributes: {
+          kind: "fx",
+          provider: "fx",
+          unit_of_measurement: "ILS",
+          source: "frankfurter",
+          published_date: new Date().toISOString().slice(0, 10),
+        },
+      },
+    },
+    callWS: async () => ({ history }),
+  };
+
+  const card = document.getElementById("card");
+  card.setConfig({ type: "custom:marketsentry-card", group_by: "kind" });
+  card.hass = mockHass;
+
+  // Signal readiness to Playwright once the card has rendered rows.
+  window.__cardReady = new Promise((resolve) => {
+    const check = () => {
+      if (card.shadowRoot && card.shadowRoot.querySelectorAll(".row").length >= 3) {
+        resolve();
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  });
+</script>
+</body>
+</html>

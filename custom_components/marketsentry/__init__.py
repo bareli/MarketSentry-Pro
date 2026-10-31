@@ -16,8 +16,11 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
@@ -161,8 +164,17 @@ def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
 
 
 async def async_setup(hass: HomeAssistant, _config: Any) -> bool:
-    """Domain-wide setup: register the `marketsentry/history` WS command once."""
+    """Domain-wide setup: WS command + the bundled marketsentry-card, once."""
     async_setup_websocket_api(hass)
+
+    card_file = Path(__file__).parent / "www" / "marketsentry-card.js"
+    if card_file.exists():
+        url_path = f"/{DOMAIN}_static/marketsentry-card.js"
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(url_path, str(card_file), cache_headers=False)]
+        )
+        add_extra_js_url(hass, url_path)
+
     return True
 
 

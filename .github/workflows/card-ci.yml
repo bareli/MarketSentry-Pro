@@ -1,0 +1,37 @@
+name: Card lint and test
+
+on:
+  push:
+    paths:
+      - "card/**"
+  pull_request:
+    paths:
+      - "card/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: card
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: card/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      # Playwright screenshot tests need a browser download and are prone
+      # to cross-platform/font rendering flakiness in CI; run them locally
+      # when touching card rendering/layout (see card/README.md).

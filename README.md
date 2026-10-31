@@ -110,6 +110,25 @@ automation:
 
 You can also build these as device triggers in the UI without writing YAML — each instrument's device lists only the trigger types that apply to its kind.
 
+## The marketsentry-card dashboard card
+
+Installed and registered automatically — add it to any dashboard like any other card:
+
+```yaml
+type: custom:marketsentry-card
+title: Markets
+group_by: kind        # none | provider | kind
+kinds:                 # omit to show every tracked instrument
+  - outcome
+  - stock
+  - fx
+```
+
+One row per tracked instrument: live value, a sparkline, a status badge
+(Live/Closing soon/Closed/Resolved for outcomes, Open/Closed for stocks,
+Updated today/Stale for FX), and a link out where one exists (Polymarket,
+stock provider page; none for FX). Configurable via the UI editor too.
+
 ## Services
 
 - `marketsentry.get_price_history` — historical price points for one tracked instrument (device, hours). Returns response data.
@@ -124,7 +143,7 @@ Each config entry exposes a diagnostics download (Settings > Devices & services 
 
 - Read-only by design. No trading, no wallet/brokerage integration, no order placement.
 - Streaming connection health is tracked per provider account, not finely per-reconnect (each provider's own `stream()` loop handles its own reconnect/backoff internally without reporting intermediate transitions); the "stream connected" binary sensor is an approximation of "the stream task is running," not a live up/down signal.
-- No frontend card yet (`marketsentry-card` from the original spec isn't built).
+- The card's "change" column is a rough 24h-window figure derived from the sparkline ring buffer (first point vs. last), not the precise windowed `price_move`/`daily_change` values the backend detectors use for firing events.
 - Some external API facts (noted per-provider below) weren't independently verified against live docs in this project's sessions; verify before relying on them in production.
 
 ## Development
@@ -166,9 +185,18 @@ inspecting that package's real APIs (`ConfigSubentryFlow`,
 rather than guessed, but hasn't been smoke-tested against a running HA
 instance.
 
-**Not built:** the `marketsentry-card` frontend (Lit/JS, Vitest, Playwright
-screenshots, visual editor) — a separate toolchain this project hasn't
-started.
+**Also landed:** the `marketsentry-card` frontend (vanilla Web Component,
+no framework dependency, bundled with esbuild — see `card/README.md`).
+Rows for every tracked instrument across providers, grouped/filterable by
+provider or kind, kind-appropriate formatting, status badges, market-state/
+source chips, sparklines (via a new `marketsentry/history` WS command
+backed by an in-memory ring buffer, `history.py`), link-out, and a visual
+editor. The Python backend auto-registers it as a Lovelace resource on
+startup — nothing for the end user to add manually. 36 Vitest unit tests
+and 5 Playwright tests (light/dark/RTL screenshots + behavioral checks)
+pass, run live in a real headless Chromium this session. Not wired into
+the Python CI workflow (separate `card-ci.yml`, Vitest only — Playwright
+needs a browser download, see `card/README.md` for known gaps).
 
 **API facts flagged as unverified in each provider's module docstring**
 (a research-fetch tool failed this session on most sources; one, Alpaca's
