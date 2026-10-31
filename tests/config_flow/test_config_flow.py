@@ -73,7 +73,7 @@ async def test_finnhub_credentials_invalid_auth(hass: HomeAssistant) -> None:
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"api_key": "bad"}
         )
-    assert result["errors"]["base"] == "invalid_auth"
+    assert result["errors"]["base"] == "invalid_auth_finnhub"
 
 
 async def test_finnhub_credentials_success_creates_entry(hass: HomeAssistant) -> None:
