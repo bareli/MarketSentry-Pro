@@ -4,9 +4,12 @@ on:
   push:
     paths:
       - "card/**"
+      - ".github/workflows/card-ci.yml"
   pull_request:
     paths:
       - "card/**"
+      - ".github/workflows/card-ci.yml"
+  workflow_dispatch: {}
 
 jobs:
   test:
