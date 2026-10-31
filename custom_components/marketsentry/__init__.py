@@ -177,7 +177,13 @@ async def async_setup(hass: HomeAssistant, _config: Any) -> bool:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(url_path, str(card_file), cache_headers=False)]
         )
-        add_extra_js_url(hass, url_path)
+        if "frontend" in hass.config.components:
+            add_extra_js_url(hass, url_path)
+        else:
+            # frontend isn't set up (e.g. a minimal/test environment); the
+            # static file is still served, it just won't auto-register as a
+            # Lovelace resource.
+            _LOGGER.debug("frontend not set up; skipping marketsentry-card auto-registration")
 
     return True
 
