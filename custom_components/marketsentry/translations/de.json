@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
             "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)",
-            "quantity": "Gehaltene Menge"
+            "quantity": "Gehaltene Menge",
+            "cost_basis": "Einstandspreis pro Einheit"
           },
           "data_description": {
             "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
             "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst.",
-            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen."
+            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen.",
+            "cost_basis": "Der Preis pro Einheit, den du bezahlt hast, verwendet zur Berechnung des unrealisierten Gewinns oder Verlusts dieses Instruments. Leer lassen, um den Gewinn/Verlust zu überspringen."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Schwellenwert für Eröffnungslücke (%)",
             "extended_hours": "Erweiterte Handelszeiten verfolgen",
             "cooldown_min": "Abklingzeit pro Ereignistyp (Minuten)",
-            "quantity": "Gehaltene Menge"
+            "quantity": "Gehaltene Menge",
+            "cost_basis": "Einstandspreis pro Einheit"
           },
           "data_description": {
             "hysteresis": "Wie weit sich der Wert zurückbewegen muss, bevor derselbe Schwellenwert erneut auslösen kann, in derselben Einheit wie der Wert dieses Instruments selbst.",
             "move_delta": "Mindeständerung innerhalb des Bewegungsfensters, die als schnelle Bewegung zählt, in derselben Einheit wie der Wert dieses Instruments selbst.",
-            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen."
+            "quantity": "Wie viele Einheiten dieses Instruments du hältst, verwendet zur Berechnung des Positionswerts und der Summe nach Art. Leer lassen, um nur den Preis zu verfolgen.",
+            "cost_basis": "Der Preis pro Einheit, den du bezahlt hast, verwendet zur Berechnung des unrealisierten Gewinns oder Verlusts dieses Instruments. Leer lassen, um den Gewinn/Verlust zu überspringen."
           }
         }
       },

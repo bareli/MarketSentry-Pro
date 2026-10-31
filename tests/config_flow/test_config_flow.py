@@ -407,3 +407,68 @@ async def test_instrument_subentry_quantity_option_round_trips(hass: HomeAssista
 
     updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
     assert updated.data["options"]["quantity"] is None
+
+
+async def test_instrument_subentry_cost_basis_option_round_trips(hass: HomeAssistant) -> None:
+    """ENH-012: the optional "cost basis per unit" field, same
+    string-encoded-in-the-form/parsed-to-float-or-None pattern as
+    `quantity` (D-031: shares the field's shape). A blank value must parse
+    to `None` (not 0), and a previously-set value must come back as the
+    reconfigure form's own default."""
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref()],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+    assert result["step_id"] == "confirm"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            "thresholds": "",
+            "hysteresis": 0.0,
+            "move_delta": 2.0,
+            "move_window_min": 60,
+            "cooldown_min": 15,
+            "quantity": "",
+            "cost_basis": "142.75",
+        },
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"]["options"]["cost_basis"] == 142.75
+
+    live_entry = hass.config_entries.async_get_entry(entry.entry_id)
+    subentry = next(iter(live_entry.subentries.values()))
+
+    reconfig = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT),
+        context={"source": "reconfigure", "subentry_id": subentry.subentry_id},
+    )
+    assert reconfig["step_id"] == "reconfigure"
+    # The 142.75 just stored is re-offered as the form's own default.
+    assert reconfig["data_schema"]({})["cost_basis"] == "142.75"
+
+    cleared = await hass.config_entries.subentries.async_configure(
+        reconfig["flow_id"],
+        {
+            "thresholds": "",
+            "hysteresis": 0.0,
+            "move_delta": 2.0,
+            "move_window_min": 60,
+            "cooldown_min": 15,
+            "quantity": "",
+            "cost_basis": "",
+        },
+    )
+    assert cleared["type"] == data_entry_flow.FlowResultType.ABORT
+    assert cleared["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
+    assert updated.data["options"]["cost_basis"] is None

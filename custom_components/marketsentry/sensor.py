@@ -18,6 +18,7 @@ from .const import (
     MARKET_STATE_POST,
     MARKET_STATE_PRE,
     MARKET_STATE_REGULAR,
+    OPT_COST_BASIS,
     OPT_QUANTITY,
     STATUS_CLOSED,
     STATUS_DISPUTED,
@@ -47,6 +48,25 @@ def _position_value(ref: InstrumentRef, quantity: float | None, price: float | N
         return None
     native_price = price * 100 if ref.kind == "outcome" else price
     return quantity * native_price
+
+
+def _unrealized_pnl(
+    quantity: float | None, cost_basis: float | None, price: float | None, is_outcome: bool
+) -> tuple[float | None, float | None]:
+    """Unrealized P&L (absolute, then percent) for ENH-012. Same
+    percent-scaling convention as `_position_value`: for `outcome`, `price`
+    is scaled to the same 0-100 percent terms `cost_basis` is entered in
+    (matching `ProbabilitySensor.native_value`), raw otherwise. `None, None`
+    when quantity or cost_basis isn't set - cost_basis is what makes P&L
+    computable at all, so it gates this the way price alone gates
+    `_position_value`."""
+    if quantity is None or cost_basis is None or price is None:
+        return None, None
+    native_price = price * 100 if is_outcome else price
+    pnl = quantity * (native_price - cost_basis)
+    cost = quantity * cost_basis
+    pnl_pct = (pnl / cost) * 100 if cost else None
+    return pnl, pnl_pct
 
 
 # Per-kind translated name for the entry-level position-value total
@@ -127,7 +147,9 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "probability"
-    _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread", "change_pp", "position_value"})
+    _attr_unrecorded_attributes = frozenset(
+        {"best_bid", "best_ask", "spread", "change_pp", "position_value", "unrealized_pnl", "unrealized_pnl_pct"}
+    )
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -149,6 +171,12 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
         position_value = _position_value(
             self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), quote.price
         )
+        pnl, pnl_pct = _unrealized_pnl(
+            self._tracker.options.get(OPT_QUANTITY),
+            self._tracker.options.get(OPT_COST_BASIS),
+            quote.price,
+            is_outcome=True,
+        )
         return {
             **card_attributes(self._tracker.ref),
             "best_bid": quote.bid,
@@ -161,6 +189,10 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
             "change_pp": round(move, 1) if move is not None else None,
             # quantity x price (ENH-011), None until a quantity is set.
             "position_value": round(position_value, 2) if position_value is not None else None,
+            # quantity x (price - cost_basis) (ENH-012), None until both
+            # quantity and cost_basis are set.
+            "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
+            "unrealized_pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -257,7 +289,9 @@ class PriceSensor(InstrumentEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "price"
-    _attr_unrecorded_attributes = frozenset({"change_pct", "position_value"})
+    _attr_unrecorded_attributes = frozenset(
+        {"change_pct", "position_value", "unrealized_pnl", "unrealized_pnl_pct"}
+    )
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -276,6 +310,12 @@ class PriceSensor(InstrumentEntity, SensorEntity):
         position_value = _position_value(
             self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), self._tracker.last_quote.price
         )
+        pnl, pnl_pct = _unrealized_pnl(
+            self._tracker.options.get(OPT_QUANTITY),
+            self._tracker.options.get(OPT_COST_BASIS),
+            self._tracker.last_quote.price,
+            is_outcome=False,
+        )
         return {
             **card_attributes(self._tracker.ref),
             # The exact windowed change (%) DailyChangeDetector uses to
@@ -284,6 +324,10 @@ class PriceSensor(InstrumentEntity, SensorEntity):
             "change_pct": round(change_pct, 2) if change_pct is not None else None,
             # quantity x price (ENH-011), None until a quantity is set.
             "position_value": round(position_value, 2) if position_value is not None else None,
+            # quantity x (price - cost_basis) (ENH-012), None until both
+            # quantity and cost_basis are set.
+            "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
+            "unrealized_pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -344,7 +388,9 @@ class RateSensor(InstrumentEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 4
     _attr_translation_key = "rate"
-    _attr_unrecorded_attributes = frozenset({"change_pct", "position_value"})
+    _attr_unrecorded_attributes = frozenset(
+        {"change_pct", "position_value", "unrealized_pnl", "unrealized_pnl_pct"}
+    )
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -365,6 +411,12 @@ class RateSensor(InstrumentEntity, SensorEntity):
         position_value = _position_value(
             self._tracker.ref, self._tracker.options.get(OPT_QUANTITY), quote.price
         )
+        pnl, pnl_pct = _unrealized_pnl(
+            self._tracker.options.get(OPT_QUANTITY),
+            self._tracker.options.get(OPT_COST_BASIS),
+            quote.price,
+            is_outcome=False,
+        )
         return {
             **card_attributes(self._tracker.ref),
             "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
@@ -375,6 +427,10 @@ class RateSensor(InstrumentEntity, SensorEntity):
             "change_pct": round(change_pct, 2) if change_pct is not None else None,
             # quantity x price (ENH-011), None until a quantity is set.
             "position_value": round(position_value, 2) if position_value is not None else None,
+            # quantity x (price - cost_basis) (ENH-012), None until both
+            # quantity and cost_basis are set.
+            "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
+            "unrealized_pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:

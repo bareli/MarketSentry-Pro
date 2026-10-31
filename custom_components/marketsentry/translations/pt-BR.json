@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
             "cooldown_min": "Tempo de espera por tipo de evento (minutos)",
-            "quantity": "Quantidade possuída"
+            "quantity": "Quantidade possuída",
+            "cost_basis": "Custo base por unidade"
           },
           "data_description": {
             "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
             "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento.",
-            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço."
+            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço.",
+            "cost_basis": "O preço por unidade que você pagou, usado para calcular o lucro ou perda não realizado deste instrumento. Deixe em branco para pular esse cálculo."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Limite de gap de abertura (%)",
             "extended_hours": "Acompanhar horário estendido",
             "cooldown_min": "Tempo de espera por tipo de evento (minutos)",
-            "quantity": "Quantidade possuída"
+            "quantity": "Quantidade possuída",
+            "cost_basis": "Custo base por unidade"
           },
           "data_description": {
             "hysteresis": "Quanto o valor precisa recuar antes que o mesmo limite possa disparar novamente, na mesma unidade do valor deste instrumento.",
             "move_delta": "Variação mínima dentro da janela de movimento que conta como um movimento rápido, na mesma unidade do valor deste instrumento.",
-            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço."
+            "quantity": "Quantas unidades deste instrumento você possui, usado para calcular o valor da posição e o total por tipo. Deixe em branco para acompanhar apenas o preço.",
+            "cost_basis": "O preço por unidade que você pagou, usado para calcular o lucro ou perda não realizado deste instrumento. Deixe em branco para pular esse cálculo."
           }
         }
       },

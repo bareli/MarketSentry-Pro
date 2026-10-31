@@ -43,6 +43,7 @@ from .const import (
     DOMAIN,
     OPT_CLOSING_SOON_HOURS,
     OPT_COOLDOWN_MIN,
+    OPT_COST_BASIS,
     OPT_DAILY_CHANGE_PCT,
     OPT_EXTENDED_HOURS,
     OPT_HYSTERESIS,
@@ -93,6 +94,13 @@ def _parse_quantity(raw: str) -> float | None:
     return float(raw) if raw else None
 
 
+# Cost basis per unit (ENH-012) is string-encoded/blank-means-unset the same
+# way quantity is (D-031: shares the field's shape) - reuse rather than
+# duplicate the float-or-blank logic.
+_cost_basis_to_str = _quantity_to_str
+_parse_cost_basis = _parse_quantity
+
+
 def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
     fields: dict[Any, Any] = {
         vol.Optional(OPT_THRESHOLDS, default=_thresholds_to_str(defaults.get(OPT_THRESHOLDS, []))): str,
@@ -101,6 +109,7 @@ def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
         vol.Optional(OPT_MOVE_WINDOW_MIN, default=defaults.get(OPT_MOVE_WINDOW_MIN, 60)): vol.Coerce(int),
         vol.Optional(OPT_COOLDOWN_MIN, default=defaults.get(OPT_COOLDOWN_MIN, 15)): vol.Coerce(int),
         vol.Optional(OPT_QUANTITY, default=_quantity_to_str(defaults.get(OPT_QUANTITY))): str,
+        vol.Optional(OPT_COST_BASIS, default=_cost_basis_to_str(defaults.get(OPT_COST_BASIS))): str,
     }
     if kind in ("stock", "fx", "crypto"):
         fields[
@@ -159,6 +168,7 @@ def _parse_options_form(kind: str, user_input: dict[str, Any]) -> dict[str, Any]
     opts = dict(default_options_for_kind(kind))
     opts[OPT_THRESHOLDS] = _parse_thresholds(user_input.get(OPT_THRESHOLDS, ""))
     opts[OPT_QUANTITY] = _parse_quantity(user_input.get(OPT_QUANTITY, ""))
+    opts[OPT_COST_BASIS] = _parse_cost_basis(user_input.get(OPT_COST_BASIS, ""))
     for key in (
         OPT_HYSTERESIS,
         OPT_MOVE_DELTA,
