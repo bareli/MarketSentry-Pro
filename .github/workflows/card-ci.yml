@@ -9,7 +9,12 @@ on:
     paths:
       - "card/**"
       - ".github/workflows/card-ci.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Regenerate Playwright screenshot baselines (uploads them as an artifact instead of asserting against the committed ones)"
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -78,4 +83,16 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: E2E tests
+        if: ${{ github.event.inputs.update_snapshots != 'true' }}
         run: npx playwright test
+
+      - name: Regenerate screenshot baselines
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        run: npx playwright test --update-snapshots
+
+      - name: Upload regenerated baselines
+        if: ${{ github.event.inputs.update_snapshots == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-snapshots
+          path: card/e2e/*.spec.js-snapshots/*-linux.png
