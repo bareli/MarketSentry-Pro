@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Bevestigen en drempels instellen",
-          "description": "Volgt **{name}** ({symbol}).",
+          "description": "Volgt **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Drempels (komma-gescheiden)",
             "hysteresis": "Hysterese",

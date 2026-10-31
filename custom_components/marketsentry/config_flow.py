@@ -8,6 +8,9 @@ instruments never re-asks for credentials.
 
 from __future__ import annotations
 
+import asyncio
+import logging
+from datetime import date
 from typing import Any
 
 import voluptuous as vol
@@ -59,7 +62,16 @@ from .const import (
     default_options_for_kind,
 )
 from .providers import PROVIDERS, build_provider
-from .providers.base import CannotConnect, InstrumentRef, InvalidAuth, Provider
+from .providers.base import CannotConnect, InstrumentRef, InvalidAuth, PricePoint, Provider
+
+_LOGGER = logging.getLogger(__name__)
+
+# ENH-017: a rough volatility hint next to the confirm step's threshold
+# fields. A week is enough points for a day-over-day average without
+# asking a rate-limited provider for much; kept short and timed out so a
+# slow/dead provider degrades to no hint rather than blocking setup.
+VOLATILITY_HINT_HOURS = 24 * 7
+VOLATILITY_HINT_TIMEOUT_SEC = 5.0
 
 STEP_PROVIDER_SCHEMA = vol.Schema(
     {
@@ -99,6 +111,91 @@ def _parse_quantity(raw: str) -> float | None:
 # duplicate the float-or-blank logic.
 _cost_basis_to_str = _quantity_to_str
 _parse_cost_basis = _parse_quantity
+
+
+def _volatility_hint_pct(points: list[PricePoint], kind: str) -> float | None:
+    """Rough average day-over-day absolute change from a short history
+    sample - one number per day (its last price in the sample), then the
+    average absolute change between consecutive days. Deliberately simple:
+    this is a sizing hint for the confirm step's threshold fields, not a
+    statistical model. `None` when there isn't enough data (fewer than two
+    distinct days) to say anything.
+
+    For `outcome`, `PricePoint.price` is the same raw 0-1 probability
+    `Quote.price` carries (see sensor.py's `_position_value`/
+    `_unrealized_pnl` `is_outcome` scaling convention), so the change is
+    expressed in percentage points (the probability delta, times 100) -
+    not a percent-of-percent relative change - matching how this project
+    already treats probability as already being in 0-100 terms. Every
+    other kind is a plain relative percent change.
+    """
+    if len(points) < 2:
+        return None
+    daily_last: dict[date, float] = {}
+    for point in sorted(points, key=lambda p: p.ts):
+        daily_last[point.ts.date()] = point.price
+    prices = list(daily_last.values())
+    if len(prices) < 2:
+        return None
+
+    deltas: list[float] = []
+    for prev, curr in zip(prices, prices[1:], strict=False):
+        if kind == "outcome":
+            deltas.append(abs(curr - prev) * 100)
+        elif prev:
+            deltas.append(abs(curr - prev) / abs(prev) * 100)
+    return sum(deltas) / len(deltas) if deltas else None
+
+
+# ENH-017: the hint's sentence, one per locale this project ships
+# translations for - the {symbol}/{value}/{unit} placeholders are filled
+# in by `_format_volatility_hint`, not by HA's own description_placeholders
+# substitution, so the clause itself is never left in English inside a
+# non-English confirm dialog. `unit` is kept as the universal finance
+# notation "%"/"pp" (percentage points) in every language rather than a
+# translated unit word, to avoid guessing per-language grammar for it.
+_VOLATILITY_HINT_TEMPLATE: dict[str, str] = {
+    "en": " {symbol} moved ~{value}{unit} on an average day over the last week.",
+    "he": " {symbol} השתנה בכ-{value}{unit} בממוצע ביום, בשבוע האחרון.",
+    "de": " {symbol} veränderte sich in der letzten Woche im Schnitt um ~{value}{unit} pro Tag.",
+    "fr": " {symbol} a varié d'environ {value}{unit} par jour en moyenne la semaine dernière.",
+    "es": " {symbol} varió en promedio ~{value}{unit} por día durante la última semana.",
+    "it": " {symbol} è variato in media di ~{value}{unit} al giorno nell'ultima settimana.",
+    "nl": " {symbol} veranderde de afgelopen week gemiddeld ~{value}{unit} per dag.",
+    "pt-br": " {symbol} variou em média ~{value}{unit} por dia na última semana.",
+}
+
+
+def _format_volatility_hint(language: str, symbol: str, value: float, unit: str) -> str:
+    template = _VOLATILITY_HINT_TEMPLATE.get(
+        language.lower(), _VOLATILITY_HINT_TEMPLATE["en"]
+    )
+    return template.format(symbol=symbol, value=f"{value:.1f}", unit=unit)
+
+
+async def _async_volatility_hint(provider: Provider, ref: InstrumentRef, language: str) -> str:
+    """A one-line threshold-sizing hint for the confirm step's
+    `description_placeholders`, or "" if none could be computed.
+
+    ENH-017: a provider outage, timeout, or a sample too thin to compute
+    anything meaningful must degrade to today's plain confirm step, never
+    block or error the confirmation - so every failure here, caught
+    broadly on purpose, just means an empty hint rather than a broken flow.
+    """
+    try:
+        points = await asyncio.wait_for(
+            provider.fetch_history(ref, hours=VOLATILITY_HINT_HOURS),
+            timeout=VOLATILITY_HINT_TIMEOUT_SEC,
+        )
+    except Exception as err:  # noqa: BLE001 - any provider failure degrades to no hint
+        _LOGGER.debug("Volatility hint unavailable for %s: %s", ref.symbol, err)
+        return ""
+
+    avg = _volatility_hint_pct(points, ref.kind)
+    if avg is None:
+        return ""
+    unit = "pp" if ref.kind == "outcome" else "%"
+    return _format_volatility_hint(language, ref.symbol, avg, unit)
 
 
 def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
@@ -386,10 +483,17 @@ class InstrumentSubentryFlow(ConfigSubentryFlow):
             return self.async_create_entry(title=ref.name, data=data, unique_id=ref.id)
 
         schema = _options_schema(ref.kind, default_options_for_kind(ref.kind))
+        volatility_hint = await _async_volatility_hint(
+            self._build_provider(), ref, self.hass.config.language
+        )
         return self.async_show_form(
             step_id="confirm",
             data_schema=schema,
-            description_placeholders={"name": ref.name, "symbol": ref.symbol},
+            description_placeholders={
+                "name": ref.name,
+                "symbol": ref.symbol,
+                "volatility_hint": volatility_hint,
+            },
         )
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:

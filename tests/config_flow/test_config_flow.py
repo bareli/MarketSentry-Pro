@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from homeassistant import config_entries, data_entry_flow
@@ -10,7 +11,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.marketsentry.const import CONF_PROVIDER, DOMAIN, SUBENTRY_TYPE_INSTRUMENT
-from custom_components.marketsentry.providers.base import CannotConnect, InstrumentRef, InvalidAuth
+from custom_components.marketsentry.providers.base import (
+    CannotConnect,
+    InstrumentRef,
+    InvalidAuth,
+    PricePoint,
+)
 
 
 def _ref(instrument_id: str = "AAPL", symbol: str = "AAPL", kind: str = "stock") -> InstrumentRef:
@@ -472,3 +478,77 @@ async def test_instrument_subentry_cost_basis_option_round_trips(hass: HomeAssis
 
     updated = hass.config_entries.async_get_entry(entry.entry_id).subentries[subentry.subentry_id]
     assert updated.data["options"]["cost_basis"] is None
+
+
+def _history_points() -> list[PricePoint]:
+    return [
+        PricePoint(ts=datetime(2026, 10, 25, 12, 0, tzinfo=UTC), price=150.0),
+        PricePoint(ts=datetime(2026, 10, 26, 12, 0, tzinfo=UTC), price=153.0),
+        PricePoint(ts=datetime(2026, 10, 27, 12, 0, tzinfo=UTC), price=150.0),
+    ]
+
+
+async def test_confirm_step_shows_volatility_hint_when_history_available(
+    hass: HomeAssistant,
+) -> None:
+    """ENH-017: once the instrument resolves, the confirm step's hint
+    reflects a real recent price sample from the provider."""
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with (
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+            return_value=[_ref()],
+        ),
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.fetch_history",
+            return_value=_history_points(),
+        ),
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+
+    assert result["step_id"] == "confirm"
+    hint = result["description_placeholders"]["volatility_hint"]
+    assert "AAPL moved" in hint
+    assert "%" in hint
+
+
+async def test_confirm_step_renders_normally_when_history_fetch_fails(
+    hass: HomeAssistant,
+) -> None:
+    """ENH-017: a provider outage while computing the volatility hint must
+    degrade to an empty hint, not block the confirm step from rendering or
+    from completing normally - same submission as every other confirm-step
+    test."""
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with (
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+            return_value=[_ref()],
+        ),
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.fetch_history",
+            side_effect=CannotConnect("down"),
+        ),
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+
+    assert result["step_id"] == "confirm"
+    assert result["description_placeholders"]["volatility_hint"] == ""
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
