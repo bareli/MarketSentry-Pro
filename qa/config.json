@@ -1,0 +1,22 @@
+{
+  "product": "MarketSentry Pro",
+  "githubRepo": "bareli/MarketSentry-Pro",
+  "mainBranch": "master",
+  "environments": {
+    "unit": {
+      "baseUrl": null,
+      "notes": "No server/URL. Offline pytest + Vitest + Playwright against mocked hass fixtures. Always safe; no gating."
+    },
+    "live": {
+      "baseUrl": "http://homeassistant.local:8123",
+      "notes": "The owner's real, running Home Assistant instance - not a disposable QA/staging environment. There is no separate 'prod' SaaS environment for this project; this IS the only live runtime, and it controls real automations/lights/notifications. Treat every write here (adding a config entry, triggering an automation, editing a live dashboard) as gated the same way RULEBOOK SS1 gates production: explicit owner go-ahead per action, never assumed from a prior approval."
+    }
+  },
+  "defaults": {
+    "environment": "unit",
+    "viewports": [
+      { "name": "desktop", "width": 1440, "height": 900 },
+      { "name": "mobile", "width": 320, "height": 568 }
+    ]
+  }
+}
