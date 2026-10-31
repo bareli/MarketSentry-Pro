@@ -79,7 +79,7 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "probability"
-    _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread"})
+    _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread", "change_pp"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -97,12 +97,17 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
         spread = None
         if quote.bid is not None and quote.ask is not None:
             spread = round((quote.ask - quote.bid) * 100, 2)
+        move = self._tracker.detectors.move.last_delta
         return {
             **card_attributes(self._tracker.ref),
             "best_bid": quote.bid,
             "best_ask": quote.ask,
             "spread": spread,
             "last_update": quote.ts.isoformat() if quote.ts else None,
+            # The exact windowed delta (percentage points) PriceMoveDetector
+            # uses to decide whether to fire `price_move` - not a card-side
+            # approximation from the sparkline buffer (ENH-009).
+            "change_pp": round(move, 1) if move is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -199,6 +204,7 @@ class PriceSensor(InstrumentEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "price"
+    _attr_unrecorded_attributes = frozenset({"change_pct"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -212,7 +218,15 @@ class PriceSensor(InstrumentEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return card_attributes(self._tracker.ref)
+        daily_change = self._tracker.detectors.daily_change
+        change_pct = daily_change.last_change_pct if daily_change is not None else None
+        return {
+            **card_attributes(self._tracker.ref),
+            # The exact windowed change (%) DailyChangeDetector uses to
+            # decide whether to fire `daily_change` - not a card-side
+            # approximation from the sparkline buffer (ENH-009).
+            "change_pct": round(change_pct, 2) if change_pct is not None else None,
+        }
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -272,6 +286,7 @@ class RateSensor(InstrumentEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 4
     _attr_translation_key = "rate"
+    _attr_unrecorded_attributes = frozenset({"change_pct"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -287,10 +302,16 @@ class RateSensor(InstrumentEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         source, _base, _quote = self._tracker.ref.id.split(":")
         quote = self._tracker.last_quote
+        daily_change = self._tracker.detectors.daily_change
+        change_pct = daily_change.last_change_pct if daily_change is not None else None
         return {
             **card_attributes(self._tracker.ref),
             "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
             "published_date": quote.ts.date().isoformat() if quote.ts else None,
+            # The exact windowed change (%) DailyChangeDetector uses to
+            # decide whether to fire `daily_change` - not a card-side
+            # approximation from the sparkline buffer (ENH-009).
+            "change_pct": round(change_pct, 2) if change_pct is not None else None,
         }
 
     async def async_added_to_hass(self) -> None:

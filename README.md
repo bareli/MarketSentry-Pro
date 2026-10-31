@@ -189,7 +189,6 @@ Each config entry exposes a diagnostics download (Settings > Devices & services 
 
 - Read-only by design. No trading, no wallet/brokerage integration, no order placement.
 - Streaming connection health is tracked per provider account, not finely per-reconnect (each provider's own `stream()` loop handles its own reconnect/backoff internally without reporting intermediate transitions); the "stream connected" binary sensor is an approximation of "the stream task is running," not a live up/down signal.
-- The card's "change" column is a rough 24h-window figure derived from the sparkline ring buffer (first point vs. last), not the precise windowed `price_move`/`daily_change` values the backend detectors use for firing events.
 - Some external API facts (noted per-provider below) weren't independently verified against live docs in this project's sessions; verify before relying on them in production.
 
 ## Development

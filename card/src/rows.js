@@ -42,6 +42,13 @@ export function buildRows(hass) {
       url: attrs.url,
       value: ["unknown", "unavailable"].includes(state.state) ? null : Number(state.state),
       unit: attrs.unit_of_measurement,
+      // The backend's own windowed change figure (the exact value its
+      // detectors use to decide whether to fire price_move/daily_change),
+      // read directly instead of approximated from the sparkline buffer
+      // (ENH-009). `changePp` (percentage points) applies to outcome rows,
+      // `changePct` (percent) to stock/crypto/fx rows.
+      changePp: attrs.change_pp ?? null,
+      changePct: attrs.change_pct ?? null,
       resolutionStatus: null,
       closed: null,
       endDate: null,
