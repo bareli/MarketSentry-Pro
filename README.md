@@ -16,6 +16,12 @@ A read-only Home Assistant integration that tracks instruments across four provi
 - Fires HA events and UI-configurable device triggers per instrument kind: `threshold_crossed`, `price_move`, `daily_change` (stocks/FX), `large_trade` (Polymarket/stocks), `volume_spike`/`closing_soon`/`resolved` (Polymarket), `market_open_gap` (stocks), `official_rate_published` (FX, Bank of Israel source).
 - Services for price history lookups and instrument search, usable from scripts, automations, or the Assist API for LLM tooling.
 
+## Screenshots
+
+| List card (grouped by kind) | Instrument detail cards | Integration icon |
+| --- | --- | --- |
+| ![Dashboard card showing prediction markets, exchange rates and stocks](docs/screenshots/dashboard-card.jpg) | ![Single-instrument detail cards for an outcome and an FX pair](docs/screenshots/instrument-cards.jpg) | ![MarketSentry Pro entry in Settings > Devices & services](docs/screenshots/integration-icon.jpg) |
+
 ## Installation (HACS)
 
 1. HACS > Integrations > search for "MarketSentry Pro" (or add this repository as a custom repository).
