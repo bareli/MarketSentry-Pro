@@ -1,7 +1,7 @@
 import { formatChange, formatValue, marketStateLabel, statusBadge } from "./format.js";
 import { filterByKind, groupRows } from "./grouping.js";
 import { DATE_LOCALES, resolveLang, t } from "./i18n.js";
-import { buildRows, changeFromHistory } from "./rows.js";
+import { buildRows } from "./rows.js";
 import { buildSparklinePath } from "./sparkline.js";
 
 const HISTORY_REFRESH_MS = 60_000;
@@ -123,10 +123,8 @@ export class MarketSentryCard extends HTMLElement {
 
   /** Polymarket-style row: title, status badge, then a probability bar with the live % and move. */
   _renderOutcomeRow(row, lang) {
-    const points = this._history.get(row.entityId) || [];
-    const { deltaPp } = changeFromHistory(points);
-    const changeText = formatChange(row.kind, null, deltaPp);
-    const changeClass = (deltaPp ?? 0) >= 0 ? "positive" : "negative";
+    const changeText = formatChange(row.kind, null, row.changePp);
+    const changeClass = (row.changePp ?? 0) >= 0 ? "positive" : "negative";
     const badgeId = statusBadge(row);
     const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);
@@ -154,10 +152,9 @@ export class MarketSentryCard extends HTMLElement {
   /** Stock/FX row: title + value/change up top, chips + sparkline below. */
   _renderGenericRow(row, lang) {
     const points = this._history.get(row.entityId) || [];
-    const { changePct, deltaPp } = changeFromHistory(points);
     const path = buildSparklinePath(points);
-    const changeText = formatChange(row.kind, changePct, deltaPp);
-    const changeClass = (deltaPp ?? changePct ?? 0) >= 0 ? "positive" : "negative";
+    const changeText = formatChange(row.kind, row.changePct, null);
+    const changeClass = (row.changePct ?? 0) >= 0 ? "positive" : "negative";
     const badgeId = statusBadge(row);
     const badge = t(lang, `badge_${badgeId}`);
     const href = safeUrl(row.url);

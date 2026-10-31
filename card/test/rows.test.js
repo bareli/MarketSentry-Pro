@@ -122,6 +122,39 @@ describe("buildRows", () => {
   });
 });
 
+describe("buildRows change attributes (ENH-009)", () => {
+  it("reads changePp/changePct verbatim from the sensor attribute, not derived from sparkline history", () => {
+    const hass = mockHass();
+    // The backend's real windowed figures - the card must surface these exactly.
+    hass.states["sensor.yes_probability"].attributes.change_pp = 4.2;
+    hass.states["sensor.aapl_price"].attributes.change_pct = -1.75;
+    const rows = buildRows(hass);
+
+    const outcome = rows.find((r) => r.kind === "outcome");
+    expect(outcome.changePp).toBe(4.2);
+
+    const stock = rows.find((r) => r.kind === "stock");
+    expect(stock.changePct).toBe(-1.75);
+
+    // A sparkline-derived approximation over the same instrument's history
+    // would disagree with the backend's figure above (different window);
+    // buildRows must not reproduce that approximation.
+    const sparklineApprox = changeFromHistory([
+      { t: "1", p: 148.2 },
+      { t: "2", p: 150.5 },
+    ]);
+    expect(sparklineApprox.changePct).not.toBeCloseTo(stock.changePct);
+  });
+
+  it("is null when the sensor attribute is absent", () => {
+    const rows = buildRows(mockHass());
+    const outcome = rows.find((r) => r.kind === "outcome");
+    const stock = rows.find((r) => r.kind === "stock");
+    expect(outcome.changePp).toBeNull();
+    expect(stock.changePct).toBeNull();
+  });
+});
+
 describe("changeFromHistory", () => {
   it("computes delta and percent change from first to last point", () => {
     const { changePct, deltaPp } = changeFromHistory([

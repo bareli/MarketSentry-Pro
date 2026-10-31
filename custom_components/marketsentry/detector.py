@@ -122,6 +122,12 @@ class PriceMoveDetector:
         self._window = timedelta(minutes=window_min)
         self._window_min = window_min
         self._history: deque[tuple[datetime, float]] = deque()
+        # The current window's computed delta/percent, kept in sync on every
+        # `update()` call (not just when it fires) so callers (sensor.py) can
+        # expose the exact figure this detector uses to decide whether to
+        # fire, instead of a card-side approximation (ENH-009).
+        self.last_delta: float | None = None
+        self.last_change_pct: float | None = None
 
     def update(self, outcome: str, token_id: str, price: float, now: datetime) -> list[DetectedEvent]:
         self._history.append((now, price))
@@ -130,12 +136,17 @@ class PriceMoveDetector:
             self._history.popleft()
 
         if not self._history:
+            self.last_delta = None
+            self.last_change_pct = None
             return []
 
         _oldest_time, oldest_price = self._history[0]
         delta = price - oldest_price
         change_pct = (delta / oldest_price * 100) if oldest_price else 0.0
         magnitude = abs(change_pct) if self._relative else abs(delta)
+
+        self.last_delta = delta
+        self.last_change_pct = change_pct
 
         if magnitude >= self._delta_pp:
             # Reset window so we don't immediately re-fire on the same move.
@@ -218,6 +229,11 @@ class DailyChangeDetector:
         self._reference: float | None = None
         self._reference_day: date | None = None
         self._fired_today = False
+        # The current day's computed change vs. the reference, kept in sync
+        # on every `update()` call (including after it has already fired for
+        # the day) so callers (sensor.py) can expose the exact figure this
+        # detector uses to decide whether to fire (ENH-009).
+        self.last_change_pct: float | None = None
 
     def update(
         self,
@@ -235,10 +251,16 @@ class DailyChangeDetector:
         elif previous_close is not None:
             self._reference = previous_close
 
-        if self._fired_today or not self._reference:
+        if not self._reference:
+            self.last_change_pct = None
             return []
 
         change_pct = (price - self._reference) / self._reference * 100
+        self.last_change_pct = change_pct
+
+        if self._fired_today:
+            return []
+
         if abs(change_pct) >= self._change_pct:
             self._fired_today = True
             return [

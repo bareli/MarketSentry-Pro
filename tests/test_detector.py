@@ -109,6 +109,18 @@ class TestPriceMoveDetector:
         events = det.update("Yes", "tok", 56.5, NOW + timedelta(minutes=11))
         assert events == []
 
+    def test_last_delta_tracks_the_current_window_even_when_not_firing(self) -> None:
+        """ENH-009 regression: `last_delta`/`last_change_pct` is the exact figure this
+        detector uses to decide whether to fire, kept in sync on every update (not just
+        when it fires) so sensor.py can expose it verbatim instead of a card-side
+        sparkline approximation."""
+        det = PriceMoveDetector(delta_pp=5.0, window_min=60)
+        det.update("Yes", "tok", 50.0, NOW)
+        det.update("Yes", "tok", 53.0, NOW + timedelta(minutes=10))  # below threshold, no fire
+
+        assert det.last_delta == 3.0
+        assert det.last_change_pct == 6.0
+
 
 class TestLargeTradeDetector:
     def test_fires_when_notional_meets_threshold(self) -> None:
@@ -269,6 +281,18 @@ class TestDailyChangeDetector:
 
         events = det.update("EUR/ILS", "fx1", 4.10, NOW + timedelta(hours=1))
         assert len(events) == 1
+
+    def test_last_change_pct_keeps_updating_after_it_has_already_fired_today(self) -> None:
+        """ENH-009 regression: `last_change_pct` is the exact figure this detector uses
+        to decide whether to fire `daily_change`, kept in sync on every update - including
+        after it has already fired once for the day - so sensor.py can expose it verbatim
+        instead of a card-side sparkline approximation."""
+        det = DailyChangeDetector(change_pct=2.0)
+        det.update("AAPL", "AAPL", 103.0, NOW, previous_close=100.0)  # fires (+3%)
+        assert det.last_change_pct == 3.0
+
+        det.update("AAPL", "AAPL", 108.0, NOW + timedelta(minutes=5), previous_close=100.0)
+        assert det.last_change_pct == 8.0  # keeps tracking even though fired_today is True
 
 
 class TestMarketOpenGapDetector:
