@@ -1,3 +1,4 @@
+import { resolveLang, t } from "./i18n.js";
 import { buildRows } from "./rows.js";
 
 export class MarketSentryInstrumentCardEditor extends HTMLElement {
@@ -62,10 +63,11 @@ export class MarketSentryInstrumentCardEditor extends HTMLElement {
   }
 
   _buildEntityField() {
+    const lang = resolveLang(this._hass);
     const wrapper = document.createElement("div");
     wrapper.className = "field";
     const label = document.createElement("label");
-    label.textContent = "Instrument";
+    label.textContent = t(lang, "editor_instrument");
     wrapper.appendChild(label);
 
     const rows = this._hass ? buildRows(this._hass) : [];
@@ -73,7 +75,7 @@ export class MarketSentryInstrumentCardEditor extends HTMLElement {
 
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = rows.length ? "Choose an instrument…" : "No MarketSentry Pro instruments found";
+    placeholder.textContent = rows.length ? t(lang, "editor_choose") : t(lang, "editor_no_instruments");
     placeholder.disabled = true;
     placeholder.selected = !this._config.entity;
     select.appendChild(placeholder);

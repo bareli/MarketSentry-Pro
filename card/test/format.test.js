@@ -72,16 +72,16 @@ describe("formatDate", () => {
 });
 
 describe("marketStateLabel", () => {
-  it("maps known states", () => {
-    expect(marketStateLabel("pre")).toBe("Pre");
-    expect(marketStateLabel("regular")).toBe("Open");
-    expect(marketStateLabel("post")).toBe("After");
-    expect(marketStateLabel("closed")).toBe("Closed");
+  it("maps known states to stable ids", () => {
+    expect(marketStateLabel("pre")).toBe("pre");
+    expect(marketStateLabel("regular")).toBe("open");
+    expect(marketStateLabel("post")).toBe("after");
+    expect(marketStateLabel("closed")).toBe("closed");
   });
 
-  it("defaults to Closed for unknown/missing state", () => {
-    expect(marketStateLabel(null)).toBe("Closed");
-    expect(marketStateLabel(undefined)).toBe("Closed");
+  it("defaults to closed for unknown/missing state", () => {
+    expect(marketStateLabel(null)).toBe("closed");
+    expect(marketStateLabel(undefined)).toBe("closed");
   });
 });
 
@@ -90,50 +90,54 @@ describe("statusBadge", () => {
 
   it("outcome: resolved takes priority", () => {
     expect(statusBadge({ kind: "outcome", resolutionStatus: "resolved", closed: true }, now)).toBe(
-      "Resolved"
+      "resolved"
     );
   });
 
-  it("outcome: closed (not resolved) shows Closed", () => {
-    expect(statusBadge({ kind: "outcome", resolutionStatus: "open", closed: true }, now)).toBe("Closed");
+  it("outcome: closed (not resolved) shows closed", () => {
+    expect(statusBadge({ kind: "outcome", resolutionStatus: "open", closed: true }, now)).toBe("closed");
   });
 
-  it("outcome: within 24h of end date shows Closing soon", () => {
+  it("outcome: within 24h of end date shows closing_soon", () => {
     expect(
       statusBadge(
         { kind: "outcome", resolutionStatus: "open", closed: false, endDate: "2026-06-11T06:00:00Z" },
         now
       )
-    ).toBe("Closing soon");
+    ).toBe("closing_soon");
   });
 
-  it("outcome: far from end date shows Live", () => {
+  it("outcome: far from end date shows live", () => {
     expect(
       statusBadge(
         { kind: "outcome", resolutionStatus: "open", closed: false, endDate: "2026-07-01T00:00:00Z" },
         now
       )
-    ).toBe("Live");
+    ).toBe("live");
   });
 
-  it("stock: regular/pre/post market state shows Open", () => {
-    expect(statusBadge({ kind: "stock", marketState: "regular" })).toBe("Open");
-    expect(statusBadge({ kind: "stock", marketState: "pre" })).toBe("Open");
+  it("stock: regular/pre/post market state shows open", () => {
+    expect(statusBadge({ kind: "stock", marketState: "regular" })).toBe("open");
+    expect(statusBadge({ kind: "stock", marketState: "pre" })).toBe("open");
   });
 
-  it("stock: closed market state shows Closed", () => {
-    expect(statusBadge({ kind: "stock", marketState: "closed" })).toBe("Closed");
+  it("stock: closed market state shows closed", () => {
+    expect(statusBadge({ kind: "stock", marketState: "closed" })).toBe("closed");
   });
 
-  it("fx: published today shows Updated today", () => {
-    expect(statusBadge({ kind: "fx", publishedDate: "2026-06-10" }, now)).toBe("Updated today");
+  it("fx: published today shows updated_today", () => {
+    expect(statusBadge({ kind: "fx", publishedDate: "2026-06-10" }, now)).toBe("updated_today");
   });
 
-  it("fx: published on an earlier date shows Stale", () => {
-    expect(statusBadge({ kind: "fx", publishedDate: "2026-06-08" }, now)).toBe("Stale");
+  it("fx: published on an earlier date shows stale", () => {
+    expect(statusBadge({ kind: "fx", publishedDate: "2026-06-08" }, now)).toBe("stale");
   });
 
-  it("fx: no published date shows Stale", () => {
-    expect(statusBadge({ kind: "fx", publishedDate: null }, now)).toBe("Stale");
+  it("fx: no published date shows stale", () => {
+    expect(statusBadge({ kind: "fx", publishedDate: null }, now)).toBe("stale");
+  });
+
+  it("crypto: always shows live (trades 24/7)", () => {
+    expect(statusBadge({ kind: "crypto" }, now)).toBe("live");
   });
 });

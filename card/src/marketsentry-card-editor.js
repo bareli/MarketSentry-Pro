@@ -1,7 +1,10 @@
+import { resolveLang, t } from "./i18n.js";
+
 const KIND_OPTIONS = [
-  { value: "outcome", label: "Prediction markets" },
-  { value: "stock", label: "Stocks" },
-  { value: "fx", label: "Exchange rates" },
+  { value: "outcome", labelKey: "group_predictions" },
+  { value: "stock", labelKey: "group_stocks" },
+  { value: "crypto", labelKey: "group_crypto" },
+  { value: "fx", labelKey: "group_fx" },
 ];
 
 export class MarketSentryCardEditor extends HTMLElement {
@@ -53,19 +56,20 @@ export class MarketSentryCardEditor extends HTMLElement {
 
     const root = document.createElement("div");
     root.className = "editor";
+    const lang = resolveLang(this._hass);
 
-    root.appendChild(this._buildTitleField());
-    root.appendChild(this._buildGroupByField());
-    root.appendChild(this._buildKindsField());
+    root.appendChild(this._buildTitleField(lang));
+    root.appendChild(this._buildGroupByField(lang));
+    root.appendChild(this._buildKindsField(lang));
 
     this.shadowRoot.appendChild(root);
   }
 
-  _buildTitleField() {
+  _buildTitleField(lang) {
     const wrapper = document.createElement("div");
     wrapper.className = "field";
     const label = document.createElement("label");
-    label.textContent = "Title (optional)";
+    label.textContent = t(lang, "editor_title");
     const input = document.createElement("input");
     input.type = "text";
     input.value = this._config.title || "";
@@ -77,16 +81,16 @@ export class MarketSentryCardEditor extends HTMLElement {
     return wrapper;
   }
 
-  _buildGroupByField() {
+  _buildGroupByField(lang) {
     const wrapper = document.createElement("div");
     wrapper.className = "field";
     const label = document.createElement("label");
-    label.textContent = "Group by";
+    label.textContent = t(lang, "editor_group_by");
     const select = document.createElement("select");
     for (const value of ["none", "provider", "kind"]) {
       const option = document.createElement("option");
       option.value = value;
-      option.textContent = value;
+      option.textContent = t(lang, `editor_group_${value}`);
       option.selected = this._config.group_by === value;
       select.appendChild(option);
     }
@@ -98,15 +102,15 @@ export class MarketSentryCardEditor extends HTMLElement {
     return wrapper;
   }
 
-  _buildKindsField() {
+  _buildKindsField(lang) {
     const wrapper = document.createElement("div");
     wrapper.className = "field";
     const label = document.createElement("label");
-    label.textContent = "Kinds (none selected = all)";
+    label.textContent = t(lang, "editor_kinds");
     wrapper.appendChild(label);
 
     const selected = new Set(this._config.kinds || []);
-    for (const { value, label: optionLabel } of KIND_OPTIONS) {
+    for (const { value, labelKey } of KIND_OPTIONS) {
       const row = document.createElement("label");
       row.className = "checkbox-row";
       const checkbox = document.createElement("input");
@@ -119,7 +123,7 @@ export class MarketSentryCardEditor extends HTMLElement {
         this._config = { ...this._config, kinds: current.size ? Array.from(current) : undefined };
         this._emitChange();
       });
-      row.append(checkbox, document.createTextNode(` ${optionLabel}`));
+      row.append(checkbox, document.createTextNode(` ${t(lang, labelKey)}`));
       wrapper.appendChild(row);
     }
     return wrapper;

@@ -27,11 +27,12 @@ test("RTL layout", async ({ page }) => {
 test("renders a row per mixed instrument with kind-appropriate chips", async ({ page }) => {
   await openHarness(page);
   const rows = page.locator("marketsentry-card").locator("css=.row");
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
 
   const names = await rows.locator(".row-name").allTextContents();
   expect(names.join(" ")).toContain("Yes");
   expect(names.join(" ")).toContain("AAPL");
+  expect(names.join(" ")).toContain("Bitcoin");
   expect(names.join(" ")).toContain("EUR/ILS");
 });
 
@@ -64,6 +65,24 @@ test("instrument card: stock kind shows a sparkline and previous close", async (
   await expect(card.locator(".value").first()).toHaveText("$150.52");
   await expect(card.locator(".stat-label")).toHaveText("Prev close");
   await expect(card.locator(".stat-value")).toHaveText("$148.20");
+
+  // Richer chart: filled area under the line, a "now" marker dot, and a
+  // min/max range label overlay.
+  await expect(card.locator(".big-spark svg path[fill-opacity]")).toHaveCount(1);
+  await expect(card.locator(".big-spark svg circle")).toHaveCount(1);
+  const rangeLabels = await card.locator(".spark-range span").allTextContents();
+  expect(rangeLabels).toHaveLength(2);
+  expect(rangeLabels[0]).toMatch(/^\$\d/); // max
+  expect(rangeLabels[1]).toMatch(/^\$\d/); // min
+});
+
+test("instrument card: crypto kind shows a live badge and no market-state/source chip", async ({ page }) => {
+  await openHarness(page);
+  const card = page.locator("#instrument-crypto");
+  await expect(card.locator(".value").first()).toHaveText("$67000.50");
+  await expect(card.locator(".badge")).toHaveText("Live");
+  await expect(card.locator(".chip")).toHaveCount(0); // no stock market-state or fx source chip
+  await expect(card.locator(".stat-label")).toHaveCount(0); // no prev-close stat (that's stock-only)
 });
 
 test("instrument card: fx kind shows the published date", async ({ page }) => {
@@ -71,4 +90,17 @@ test("instrument card: fx kind shows the published date", async ({ page }) => {
   const card = page.locator("#instrument-fx");
   await expect(card.locator(".value").first()).toHaveText("3.9123 ILS");
   await expect(card.locator(".footer")).toContainText("Published");
+});
+
+test("renders in Hebrew when hass's language is he", async ({ page }) => {
+  await openHarness(page, "?lang=he&dir=rtl");
+  const list = page.locator("marketsentry-card");
+  const groupLabels = await list.locator(".group-label").allTextContents();
+  expect(groupLabels).toContain("שוקי חיזוי"); // "Prediction markets"
+  expect(groupLabels).toContain("מניות"); // "Stocks"
+  expect(groupLabels).toContain("מטבעות קריפטו"); // "Cryptocurrencies"
+  expect(groupLabels).toContain("שערי חליפין"); // "Exchange rates"
+
+  const stockCard = page.locator("#instrument-stock");
+  await expect(stockCard.locator(".stat-label")).toHaveText("סגירה קודמת"); // "Prev close"
 });

@@ -88,7 +88,7 @@ def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
         vol.Optional(OPT_MOVE_WINDOW_MIN, default=defaults.get(OPT_MOVE_WINDOW_MIN, 60)): vol.Coerce(int),
         vol.Optional(OPT_COOLDOWN_MIN, default=defaults.get(OPT_COOLDOWN_MIN, 15)): vol.Coerce(int),
     }
-    if kind in ("stock", "fx"):
+    if kind in ("stock", "fx", "crypto"):
         fields[
             vol.Optional(OPT_DAILY_CHANGE_PCT, default=defaults.get(OPT_DAILY_CHANGE_PCT, 3.0))
         ] = vol.Coerce(float)

@@ -1,19 +1,20 @@
 # MarketSentry Pro
 
-MarketSentry Pro: monitor prediction markets, stocks and exchange rates in Home Assistant and automate on price changes.
+MarketSentry Pro: monitor prediction markets, stocks, crypto and exchange rates in Home Assistant and automate on price changes.
 
-> **Unofficial, not affiliated with Polymarket, Finnhub, Alpaca, the Bank of Israel or any other provider.** This integration only reads public endpoints with each provider's own no-auth or free-tier access. It cannot trade, place orders, or touch a wallet or brokerage account. Each provider's terms of service (Finnhub's free tier is personal/non-commercial use only) and your local regulations apply to how you use this data.
+> **Unofficial, not affiliated with Polymarket, Finnhub, Alpaca, CoinGecko, the Bank of Israel or any other provider.** This integration only reads public endpoints with each provider's own no-auth or free-tier access. It cannot trade, place orders, or touch a wallet or brokerage account. Each provider's terms of service (Finnhub's free tier is personal/non-commercial use only) and your local regulations apply to how you use this data.
 
-A read-only Home Assistant integration that tracks instruments across four providers and lets your automations react to price moves, thresholds, large trades, and more.
+A read-only Home Assistant integration that tracks instruments across five providers and lets your automations react to price moves, thresholds, large trades, and more.
 
 ## What it does
 
 - **Polymarket** — prediction market outcomes. Live probability, best bid/ask, spread, last trade price, volume, liquidity, end date, and resolution status, pushed over Polymarket's WebSocket feed.
 - **Finnhub** — US stocks (free tier, personal/non-commercial use, your own API key). Live trades over WebSocket.
 - **Alpaca** — US stocks via the free IEX feed (optional, your own API key pair). IEX prices only, not the consolidated tape.
+- **CoinGecko** — cryptocurrencies, priced in USD (free tier, no key). REST poll only, same cadence as FX.
 - **FX** — exchange rates from Frankfurter (market mid-rate, no key) or the Bank of Israel's official daily representative rate (שער יציג, no key).
 - Every REST-polling provider's prices refresh at least every 5 minutes regardless of streaming state, so sensors stay current even if a WebSocket connection drops.
-- Fires HA events and UI-configurable device triggers per instrument kind: `threshold_crossed`, `price_move`, `daily_change` (stocks/FX), `large_trade` (Polymarket/stocks), `volume_spike`/`closing_soon`/`resolved` (Polymarket), `market_open_gap` (stocks), `official_rate_published` (FX, Bank of Israel source).
+- Fires HA events and UI-configurable device triggers per instrument kind: `threshold_crossed`, `price_move`, `daily_change` (stocks/crypto/FX), `large_trade` (Polymarket/stocks), `volume_spike`/`closing_soon`/`resolved` (Polymarket), `market_open_gap` (stocks), `official_rate_published` (FX, Bank of Israel source).
 - Services for price history lookups and instrument search, usable from scripts, automations, or the Assist API for LLM tooling.
 
 ## Screenshots
@@ -32,11 +33,12 @@ A read-only Home Assistant integration that tracks instruments across four provi
 
 One config entry = one provider account. Credentials (if the provider needs any) are entered once; instruments are added afterward as **subentries** under that entry, so adding/removing an instrument never re-asks for a key.
 
-1. **Add integration > MarketSentry Pro**, pick a provider: Polymarket, Finnhub, Alpaca, or Exchange rates.
-2. Polymarket and Exchange rates need no credentials. Finnhub needs an API key; Alpaca needs a key ID + secret (and a feed choice, default `iex`). Credentials are validated live.
+1. **Add integration > MarketSentry Pro**, pick a provider: Polymarket, Finnhub, Alpaca, CoinGecko (crypto), or Exchange rates.
+2. Polymarket, CoinGecko and Exchange rates need no credentials. Finnhub needs an API key; Alpaca needs a key ID + secret (and a feed choice, default `iex`). Credentials are validated live.
 3. On the new entry's page, use **Add instrument** (a subentry) and paste:
    - a Polymarket URL/slug (`polymarket.com/event/...` or `/market/...`), or free text to search,
    - a stock ticker (Finnhub/Alpaca), or free text to search (Finnhub only — Alpaca has no search, paste an exact ticker),
+   - a CoinGecko coin id (e.g. `bitcoin`), or free text to search (e.g. `btc` or `bitcoin`),
    - an FX pair like `EUR/ILS` (Frankfurter market rate) or `EUR/ILS/boi` (Bank of Israel official rate).
 4. If a Polymarket market has multiple outcomes or a search returns several matches, pick one; run **Add instrument** again for any others.
 5. Confirm and set per-instrument thresholds, move/daily-change sensitivity, large-trade size, cooldown, etc. (defaults are sensible per kind). Edit them later via the subentry's **Reconfigure**.
@@ -116,6 +118,16 @@ automation:
 
 You can also build these as device triggers in the UI without writing YAML — each instrument's device lists only the trigger types that apply to its kind.
 
+### Ready-made blueprints
+
+No YAML needed — import one of these and fill in the blanks from the UI:
+
+- [**Notify on any event**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fnotify_on_event.yaml) - pick any MarketSentry Pro device trigger and any notification action; the trigger's full event data is available in your action as `{{ trigger.event.data }}`.
+- [**Announce a resolved Polymarket outcome**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fresolved_announce.yaml) - flash a light and/or speak the result when a tracked outcome resolves.
+- [**Daily digest**](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbareli%2FMarketSentry-Pro%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fmarketsentry%2Fdaily_digest.yaml) - one consolidated notification per day listing every tracked instrument's current value, instead of per-event alerts.
+
+Or browse the raw files in [`blueprints/automation/marketsentry/`](blueprints/automation/marketsentry/) and import manually via Settings > Automations & scenes > Blueprints > Import blueprint.
+
 ## The marketsentry-card dashboard card
 
 Installed and registered automatically — add it to any dashboard like any other card:
@@ -135,15 +147,43 @@ One row per tracked instrument: live value, a sparkline, a status badge
 Updated today/Stale for FX), and a link out where one exists (Polymarket,
 stock provider page; none for FX). Configurable via the UI editor too.
 
+## Auto-dashboard view (no manual card placement)
+
+Add a new view to any dashboard and set it to generate itself instead of
+hand-placing cards: edit the dashboard (pencil icon) > Add view > switch
+the view to YAML mode (3-dot menu) and set it to:
+
+```yaml
+strategy:
+  type: custom:marketsentry
+  # title: My Markets      # optional, defaults to "Markets"
+  # group_by: kind         # optional: none | provider | kind
+  # kinds: [stock]         # optional filter; omit to include everything
+```
+
+The view fills itself with the `marketsentry-card` overview plus one
+`marketsentry-instrument-card` per tracked instrument, and reflects
+instruments you add or remove the next time the view loads - no manual
+card placement, ever.
+
 ## Services
 
 - `marketsentry.get_price_history` — historical price points for one tracked instrument (device, hours). Returns response data.
 - `marketsentry.refresh` — force an immediate price refresh for a tracked instrument's provider account.
 - `marketsentry.search_instruments` — search a provider by free text (provider, query, limit). Returns response data; usable from Assist/LLM tooling.
 
+## Languages
+
+The backend (config flow, entities, device triggers, services) and the
+`marketsentry-card`/`marketsentry-instrument-card` frontend are both
+translated into English, Hebrew, German, French, Spanish, Portuguese
+(Brazil), Italian and Dutch, following Home Assistant's own UI language
+setting. The card falls back to the closest supported base language (e.g.
+`de-AT` → `de`) and then to English for anything unsupported.
+
 ## Diagnostics
 
-Each config entry exposes a diagnostics download (Settings > Devices & services > MarketSentry Pro > entry > Download diagnostics) with provider/stream connection state and per-instrument quote state. Finnhub/Alpaca credentials in the entry's stored data are redacted; every price endpoint itself is public.
+Each config entry exposes a diagnostics download (Settings > Devices & services > MarketSentry Pro > entry > Download diagnostics) with provider/stream connection state and per-instrument quote state. Finnhub/Alpaca credentials in the entry's stored data are redacted; every price endpoint (including CoinGecko's) itself is public.
 
 ## Limitations
 
@@ -219,3 +259,13 @@ these in production:
   the `c[DATA_TYPE]=OF00` filter syntax — taken from BOI's own published
   guide, not a live test call. `fetch_history` for this source isn't
   implemented yet, pending that verification.
+- CoinGecko: the free `/search`, `/coins/{id}`, `/simple/price`, and
+  `/coins/{id}/market_chart` endpoints and their response shapes — built
+  against CoinGecko's long-documented public v3 contract, not a live test
+  call this session.
+- The `custom:marketsentry` dashboard view strategy (`ll-strategy-view-marketsentry`):
+  built against the documented HA view-strategy contract
+  (`static generate(config, hass)` on a custom element named
+  `ll-strategy-view-<type>`) and covered by a unit test of its card-building
+  logic, but not smoke-tested against a running HA frontend's actual
+  strategy-resolution wiring in this project.

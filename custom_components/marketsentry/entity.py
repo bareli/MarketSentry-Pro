@@ -24,6 +24,7 @@ _MODEL_BY_KIND = {
     "outcome": "Prediction market outcome",
     "stock": "Stock",
     "fx": "Exchange rate",
+    "crypto": "Cryptocurrency",
 }
 
 

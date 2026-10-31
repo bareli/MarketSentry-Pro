@@ -1,0 +1,37 @@
+blueprint:
+  name: MarketSentry Pro - Notify on any event
+  description: >-
+    Pick any MarketSentry Pro device trigger (threshold crossed, fast price
+    move, daily change, large trade, volume spike, resolved, closing soon,
+    market-open gap, official rate published) and run your own notification
+    action. The trigger's full event data (name, symbol, old, new, delta,
+    url, ...) is available in your action as `trigger.event.data`.
+  domain: automation
+  input:
+    market_trigger:
+      name: Trigger
+      description: Pick a device, then a MarketSentry Pro trigger type on it.
+      selector:
+        trigger: {}
+    notify_action:
+      name: Notification action
+      description: >-
+        What to do when the trigger fires. A default mobile-app
+        notification step is pre-filled below; edit the message or replace
+        it with any action (TTS, light flash, etc). Useful template
+        variables: {{ trigger.event.data.name }}, {{ trigger.event.data.old }},
+        {{ trigger.event.data.new }}, {{ trigger.event.data.delta }},
+        {{ trigger.event.data.url }}.
+      default:
+        - action: notify.persistent_notification
+          data:
+            title: MarketSentry Pro
+            message: >-
+              {{ trigger.event.data.name }}: {{ trigger.event.data.old }} ->
+              {{ trigger.event.data.new }}
+      selector:
+        action: {}
+
+trigger: !input market_trigger
+
+action: !input notify_action

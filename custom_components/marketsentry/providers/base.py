@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-InstrumentKind = Literal["outcome", "stock", "fx"]
+InstrumentKind = Literal["outcome", "stock", "fx", "crypto"]
 
 MarketState = Literal["pre", "regular", "post", "closed"]
 

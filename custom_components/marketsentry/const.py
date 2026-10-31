@@ -23,7 +23,7 @@ CONF_KEY_ID: Final = "key_id"
 CONF_SECRET_KEY: Final = "secret_key"
 CONF_FEED: Final = "feed"
 
-PROVIDER_KEYS: Final = ("polymarket", "finnhub", "alpaca", "fx")
+PROVIDER_KEYS: Final = ("polymarket", "finnhub", "alpaca", "fx", "coingecko")
 
 # --- Subentry keys: one subentry = one tracked instrument ---
 SUBENTRY_TYPE_INSTRUMENT: Final = "instrument"
@@ -84,6 +84,15 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_EXTENDED_HOURS: False,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
         }
+    if kind == "crypto":
+        return {
+            OPT_THRESHOLDS: [],
+            OPT_HYSTERESIS: 0.0,
+            OPT_MOVE_DELTA: 3.0,
+            OPT_MOVE_WINDOW_MIN: 60,
+            OPT_DAILY_CHANGE_PCT: DEFAULT_DAILY_CHANGE_PCT,
+            OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
+        }
     # fx
     return {
         OPT_THRESHOLDS: [],
@@ -141,6 +150,11 @@ EVENT_TYPES_BY_KIND: Final[dict[str, list[str]]] = {
         EVENT_DAILY_CHANGE,
         EVENT_OFFICIAL_RATE_PUBLISHED,
     ],
+    "crypto": [
+        EVENT_THRESHOLD_CROSSED,
+        EVENT_PRICE_MOVE,
+        EVENT_DAILY_CHANGE,
+    ],
 }
 
 ALL_EVENT_TYPES: Final = sorted({e for types in EVENT_TYPES_BY_KIND.values() for e in types})
@@ -174,4 +188,5 @@ PROVIDER_MANUFACTURER: Final[dict[str, str]] = {
     "finnhub": "Finnhub (unofficial)",
     "alpaca": "Alpaca (unofficial)",
     "fx": "Frankfurter / Bank of Israel (unofficial)",
+    "coingecko": "CoinGecko (unofficial)",
 }

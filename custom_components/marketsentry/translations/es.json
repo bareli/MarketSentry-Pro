@@ -1,0 +1,190 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Añadir una cuenta de proveedor",
+        "description": "Elige qué proveedor de datos de mercado sigue esta cuenta. Las credenciales (si son necesarias) se introducen una vez; los instrumentos se añaden después sin volver a pedirlas.",
+        "data": {
+          "provider": "Proveedor"
+        }
+      },
+      "finnhub_credentials": {
+        "title": "Clave API de Finnhub",
+        "description": "El plan gratuito de Finnhub es solo para uso personal, no comercial. Obtén una clave gratuita en finnhub.io.",
+        "data": {
+          "api_key": "Clave API"
+        }
+      },
+      "alpaca_credentials": {
+        "title": "Credenciales de API de Alpaca",
+        "description": "Plan Basic gratuito: solo feed IEX, no la cinta consolidada.",
+        "data": {
+          "key_id": "ID de clave",
+          "secret_key": "Clave secreta",
+          "feed": "Feed"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credenciales no válidas.",
+      "cannot_connect": "No se pudo contactar con el proveedor. Inténtalo más tarde."
+    },
+    "abort": {
+      "already_configured": "Esta cuenta de proveedor ya está configurada."
+    }
+  },
+  "config_subentries": {
+    "instrument": {
+      "entry_type": "Instrumento",
+      "initiate_flow": {
+        "user": "Añadir instrumento",
+        "reconfigure": "Editar opciones del instrumento"
+      },
+      "step": {
+        "user": {
+          "title": "Seguir un instrumento",
+          "description": "Pega una URL/slug (Polymarket), un ticker (acciones) o un par como EUR/ILS (FX; añade /boi para el tipo oficial del Banco de Israel en lugar del tipo de mercado). El texto libre también funciona como búsqueda.",
+          "data": {
+            "url_or_query": "URL, ticker o par"
+          }
+        },
+        "select": {
+          "title": "Varias coincidencias",
+          "description": "Elige una. Ejecuta \"Añadir instrumento\" de nuevo para las demás.",
+          "data": {
+            "instrument": "Instrumento"
+          }
+        },
+        "confirm": {
+          "title": "Confirmar y establecer umbrales",
+          "description": "Siguiendo **{name}** ({symbol}).",
+          "data": {
+            "thresholds": "Umbrales (separados por comas)",
+            "hysteresis": "Histéresis",
+            "move_delta": "Disparador de movimiento de precio",
+            "move_window_min": "Ventana de movimiento de precio (minutos)",
+            "daily_change_pct": "Disparador de cambio diario (%)",
+            "large_trade_usd": "Umbral de operación grande (USD)",
+            "volume_spike_pct": "Umbral de pico de volumen en 24h (%)",
+            "closing_soon_hours": "Umbral de \"cierra pronto\" (horas)",
+            "market_open_gap_pct": "Umbral de hueco de apertura (%)",
+            "extended_hours": "Seguir horario extendido",
+            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+          }
+        },
+        "reconfigure": {
+          "title": "Editar opciones de {name}",
+          "data": {
+            "thresholds": "Umbrales (separados por comas)",
+            "hysteresis": "Histéresis",
+            "move_delta": "Disparador de movimiento de precio",
+            "move_window_min": "Ventana de movimiento de precio (minutos)",
+            "daily_change_pct": "Disparador de cambio diario (%)",
+            "large_trade_usd": "Umbral de operación grande (USD)",
+            "volume_spike_pct": "Umbral de pico de volumen en 24h (%)",
+            "closing_soon_hours": "Umbral de \"cierra pronto\" (horas)",
+            "market_open_gap_pct": "Umbral de hueco de apertura (%)",
+            "extended_hours": "Seguir horario extendido",
+            "cooldown_min": "Tiempo de espera por tipo de evento (minutos)"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Credenciales no válidas.",
+        "cannot_connect": "No se pudo contactar con el proveedor. Inténtalo más tarde.",
+        "not_found": "No se encontró ninguna coincidencia."
+      },
+      "abort": {
+        "already_configured": "Este instrumento ya se sigue en esta cuenta.",
+        "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]"
+      }
+    }
+  },
+  "issues": {
+    "market_not_found": {
+      "title": "Mercado de Polymarket no encontrado",
+      "description": "No se pudo encontrar el mercado seguido {slug} en Polymarket. Puede haber sido eliminado o archivado. Elimina y vuelve a añadir el instrumento afectado con un mercado válido."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "probability": { "name": "Probabilidad" },
+      "last_trade_price": { "name": "Último precio negociado" },
+      "spread": { "name": "Spread" },
+      "volume_24hr": { "name": "Volumen 24h" },
+      "total_volume": { "name": "Volumen total" },
+      "liquidity": { "name": "Liquidez" },
+      "end_date": { "name": "Fecha de fin" },
+      "resolution_status": {
+        "name": "Estado de resolución",
+        "state": {
+          "open": "Abierto",
+          "proposed": "Propuesto",
+          "disputed": "Disputado",
+          "resolved": "Resuelto",
+          "closed": "Cerrado"
+        }
+      },
+      "winning_outcome": { "name": "Resultado ganador" },
+      "price": { "name": "Precio" },
+      "previous_close": { "name": "Cierre anterior" },
+      "market_state": {
+        "name": "Estado del mercado",
+        "state": {
+          "pre": "Pre-apertura",
+          "regular": "Abierto",
+          "post": "Post-cierre",
+          "closed": "Cerrado"
+        }
+      },
+      "rate": { "name": "Tipo de cambio" }
+    },
+    "binary_sensor": {
+      "closed": { "name": "Cerrado" },
+      "accepting_orders": { "name": "Aceptando órdenes" },
+      "stream_connected": { "name": "Flujo conectado" }
+    },
+    "event": {
+      "detections": { "name": "Detecciones" }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "threshold_crossed": "El valor cruzó un umbral",
+      "price_move": "Movimiento de precio rápido",
+      "daily_change": "Umbral de cambio diario",
+      "large_trade": "Se produjo una operación grande",
+      "volume_spike": "Pico de volumen en 24h",
+      "resolved": "Mercado resuelto",
+      "closing_soon": "Cierra pronto",
+      "market_open_gap": "Hueco de apertura",
+      "official_rate_published": "Nuevo tipo oficial publicado"
+    }
+  },
+  "services": {
+    "get_price_history": {
+      "name": "Obtener historial de precios",
+      "description": "Obtiene puntos de precio históricos de un instrumento seguido.",
+      "fields": {
+        "device_id": { "name": "Dispositivo", "description": "El dispositivo del instrumento seguido." },
+        "hours": { "name": "Horas", "description": "Cuántas horas de historial obtener." }
+      }
+    },
+    "refresh": {
+      "name": "Actualizar",
+      "description": "Fuerza una actualización inmediata de precios para la cuenta de proveedor de un instrumento seguido.",
+      "fields": {
+        "device_id": { "name": "Dispositivo", "description": "El dispositivo del instrumento seguido." }
+      }
+    },
+    "search_instruments": {
+      "name": "Buscar instrumentos",
+      "description": "Busca instrumentos que coincidan con una consulta en un proveedor.",
+      "fields": {
+        "provider": { "name": "Proveedor", "description": "Qué proveedor buscar." },
+        "query": { "name": "Consulta", "description": "Texto de búsqueda." },
+        "limit": { "name": "Límite", "description": "Número máximo de resultados." }
+      }
+    }
+  }
+}

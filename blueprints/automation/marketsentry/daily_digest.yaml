@@ -1,0 +1,44 @@
+blueprint:
+  name: MarketSentry Pro - Daily digest
+  description: >-
+    Once a day, send one consolidated notification listing the current
+    value of every tracked MarketSentry Pro instrument (Polymarket
+    probability, stock price, FX rate). Useful as a single daily summary
+    instead of per-event alerts.
+  domain: automation
+  input:
+    digest_time:
+      name: Time of day
+      default: "08:00:00"
+      selector:
+        time: {}
+    notify_action:
+      name: Notification action
+      description: >-
+        What to do with the digest. The rendered summary is available as
+        `{{ digest }}` (one instrument per line); a default persistent
+        notification is pre-filled below.
+      default:
+        - action: notify.persistent_notification
+          data:
+            title: MarketSentry Pro - Daily digest
+            message: "{{ digest }}"
+      selector:
+        action: {}
+
+trigger:
+  - trigger: time
+    at: !input digest_time
+
+variables:
+  tracked: "{{ expand(integration_entities('marketsentry')) | selectattr('attributes.kind', 'defined') | list }}"
+  digest: >-
+    {% if tracked | count == 0 -%}
+    No MarketSentry Pro instruments are tracked yet.
+    {%- else -%}
+    {% for s in tracked -%}
+    {{ s.attributes.friendly_name }}: {{ s.state }}{{ ' ' ~ s.attributes.unit_of_measurement if s.attributes.unit_of_measurement else '' }}
+    {% endfor -%}
+    {%- endif %}
+
+action: !input notify_action
