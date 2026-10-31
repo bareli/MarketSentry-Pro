@@ -1,4 +1,4 @@
-"""Tests for providers/fx.py: Frankfurter + Bank of Israel source routing."""
+"""Tests for providers/fx.py: Frankfurter + Bank of Israel + VATComply source routing."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ async def _provider_for(aiohttp_client, app: web.Application) -> FxProvider:
     client = await aiohttp_client(app)
     fx_module.FRANKFURTER_BASE_URL = str(client.make_url("/frankfurter")).rstrip("/")
     fx_module.BOI_SDMX_BASE_URL = str(client.make_url("/boi")).rstrip("/")
+    fx_module.VATCOMPLY_BASE_URL = str(client.make_url("/vatcomply")).rstrip("/")
     return FxProvider(client.session)
 
 
@@ -226,3 +227,97 @@ async def test_boi_fetch_latest_raises_when_no_rows(aiohttp_client) -> None:
 
     with pytest.raises(CannotConnect):
         await provider.resolve("USD/ILS/boi")
+
+
+async def test_resolve_vatcomply_suffix_selects_alternate_source(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        assert request.query["base"] == "EUR"
+        assert request.query["symbols"] == "ILS"
+        return web.json_response({"date": "2026-10-30", "base": "EUR", "rates": {"ILS": 3.91}})
+
+    app = web.Application()
+    app.router.add_get("/vatcomply/rates", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    refs = await provider.resolve("EUR/ILS/vatcomply")
+
+    assert refs[0].id == "vatcomply:EUR:ILS"
+    assert "VATComply" in refs[0].name
+
+
+async def test_fetch_snapshot_vatcomply(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"date": "2026-10-30", "base": "EUR", "rates": {"ILS": 3.91}})
+
+    app = web.Application()
+    app.router.add_get("/vatcomply/rates", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="vatcomply:EUR:ILS", symbol="EUR/ILS", name="EUR/ILS", kind="fx", unit="ILS")
+    quotes = await provider.fetch_snapshot([ref])
+
+    assert quotes[ref.id].price == 3.91
+
+
+async def test_vatcomply_quote_raises_when_rate_missing(aiohttp_client) -> None:
+    async def vatcomply_handler(request: web.Request) -> web.Response:
+        return web.json_response({"date": "2026-10-30", "base": "EUR", "rates": {}})
+
+    async def boi_handler(request: web.Request) -> web.Response:
+        # A successful BOI response here would mean "vatcomply:" misrouted to the BOI
+        # dispatch branch - if it did, quotes would end up non-empty and this test would
+        # catch it, instead of coincidentally passing via an unrelated 404.
+        return web.Response(text="TIME_PERIOD,OBS_VALUE\n2026-10-29,3.90\n", content_type="text/csv")
+
+    app = web.Application()
+    app.router.add_get("/vatcomply/rates", vatcomply_handler)
+    app.router.add_get("/boi/RER_EUR_ILS", boi_handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="vatcomply:EUR:ILS", symbol="EUR/ILS", name="EUR/ILS", kind="fx", unit="ILS")
+    quotes = await provider.fetch_snapshot([ref])
+    assert quotes == {}
+
+
+async def test_fetch_history_vatcomply_issues_one_request_per_day(aiohttp_client) -> None:
+    """VATComply (ENH-018) has no start/end range param, unlike Frankfurter/BOI - confirmed
+    live, 2026-11-01: fetch_history issues one dated request per day in range instead of a
+    single ranged call."""
+
+    calls: list[str] = []
+
+    async def handler(request: web.Request) -> web.Response:
+        calls.append(request.query["date"])
+        return web.json_response({"date": request.query["date"], "base": "EUR", "rates": {"ILS": 3.9}})
+
+    app = web.Application()
+    app.router.add_get("/vatcomply/rates", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="vatcomply:EUR:ILS", symbol="EUR/ILS", name="EUR/ILS", kind="fx", unit="ILS")
+    points = await provider.fetch_history(ref, hours=48)
+
+    assert len(calls) == len(points)
+    assert len(points) >= 2
+    assert all(p.price == 3.9 for p in points)
+    assert len(set(calls)) == len(calls)  # one distinct date per request
+
+
+async def test_fetch_history_vatcomply_raises_cannot_connect_on_request_failure(aiohttp_client) -> None:
+    async def vatcomply_handler(request: web.Request) -> web.Response:
+        return web.Response(status=500)
+
+    async def boi_handler(request: web.Request) -> web.Response:
+        # A successful BOI response here would mean "vatcomply:" misrouted to the BOI
+        # dispatch branch - if it did, this would return points instead of raising, and
+        # this test would catch it, instead of coincidentally passing via an unrelated 404.
+        return web.Response(text="TIME_PERIOD,OBS_VALUE\n2026-10-29,3.90\n", content_type="text/csv")
+
+    app = web.Application()
+    app.router.add_get("/vatcomply/rates", vatcomply_handler)
+    app.router.add_get("/boi/RER_EUR_ILS", boi_handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="vatcomply:EUR:ILS", symbol="EUR/ILS", name="EUR/ILS", kind="fx", unit="ILS")
+    with pytest.raises(CannotConnect):
+        await provider.fetch_history(ref, hours=24)

@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Suivre un instrument",
-          "description": "Collez une URL/un slug (Polymarket), un symbole boursier (actions, p. ex. AAPL, MSFT, TSLA), un identifiant de pièce (crypto, p. ex. bitcoin, ethereum) ou une paire comme EUR/ILS (FX ; ajoutez /boi pour le taux officiel de la Banque d'Israël au lieu du taux de marché). Le texte libre fonctionne aussi comme recherche.",
+          "description": "Collez une URL/un slug (Polymarket), un symbole boursier (actions, p. ex. AAPL, MSFT, TSLA), un identifiant de pièce (crypto, p. ex. bitcoin, ethereum) ou une paire comme EUR/ILS (FX ; ajoutez /boi pour le taux officiel de la Banque d'Israël, ou /vatcomply pour une source de taux de marché alternative, au lieu du taux de marché par défaut). Le texte libre fonctionne aussi comme recherche.",
           "data": {
             "url_or_query": "URL, symbole ou paire"
           }

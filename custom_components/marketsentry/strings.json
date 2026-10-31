@@ -43,7 +43,7 @@
       "step": {
         "user": {
           "title": "Track an instrument",
-          "description": "Paste a URL/slug (Polymarket), ticker (stocks, e.g. AAPL, MSFT, TSLA), coin id (crypto, e.g. bitcoin, ethereum), or pair like EUR/ILS (FX; add /boi for the Bank of Israel official rate instead of the market rate). Free text also works as a search.",
+          "description": "Paste a URL/slug (Polymarket), ticker (stocks, e.g. AAPL, MSFT, TSLA), coin id (crypto, e.g. bitcoin, ethereum), or pair like EUR/ILS (FX; add /boi for the Bank of Israel official rate, or /vatcomply for an alternate market-rate source, instead of the default market rate). Free text also works as a search.",
           "data": {
             "url_or_query": "URL, ticker, or pair"
           }

@@ -12,7 +12,7 @@ A read-only Home Assistant integration that tracks instruments across five provi
 - **Finnhub** — US stocks (free tier, personal/non-commercial use, your own API key). Live trades over WebSocket.
 - **Alpaca** — US stocks via the free IEX feed (optional, your own API key pair). IEX prices only, not the consolidated tape.
 - **CoinGecko** — cryptocurrencies, priced in USD (free tier, no key). REST poll only, same cadence as FX.
-- **FX** — exchange rates from Frankfurter (market mid-rate, no key) or the Bank of Israel's official daily representative rate (שער יציג, no key).
+- **FX** — exchange rates from Frankfurter or VATComply (market mid-rate, no key, two independent sources for redundancy) or the Bank of Israel's official daily representative rate (שער יציג, no key).
 - Every REST-polling provider's prices refresh at least every 5 minutes regardless of streaming state, so sensors stay current even if a WebSocket connection drops.
 - Fires HA events and UI-configurable device triggers per instrument kind: `threshold_crossed`, `price_move`, `daily_change` (stocks/crypto/FX), `large_trade` (Polymarket/stocks), `volume_spike`/`closing_soon`/`resolved` (Polymarket), `market_open_gap` (stocks), `official_rate_published` (FX, Bank of Israel source).
 - Services for price history lookups and instrument search, usable from scripts, automations, or the Assist API for LLM tooling.
@@ -39,7 +39,7 @@ One config entry = one provider account. Credentials (if the provider needs any)
    - a Polymarket URL/slug (`polymarket.com/event/...` or `/market/...`), or free text to search,
    - a stock ticker (Finnhub/Alpaca), or free text to search (Finnhub only — Alpaca has no search, paste an exact ticker),
    - a CoinGecko coin id (e.g. `bitcoin`), or free text to search (e.g. `btc` or `bitcoin`),
-   - an FX pair like `EUR/ILS` (Frankfurter market rate) or `EUR/ILS/boi` (Bank of Israel official rate).
+   - an FX pair like `EUR/ILS` (Frankfurter market rate), `EUR/ILS/boi` (Bank of Israel official rate), or `EUR/ILS/vatcomply` (VATComply market rate, a second market-rate source for redundancy).
 4. If a Polymarket market has multiple outcomes or a search returns several matches, pick one; run **Add instrument** again for any others.
 5. Confirm and set per-instrument thresholds, move/daily-change sensitivity, large-trade size, cooldown, etc. (defaults are sensible per kind). Edit them later via the subentry's **Reconfigure**.
 
@@ -252,6 +252,12 @@ confirmed without an owner account on a third-party service):
   `c[DATA_TYPE]=OF00` filter this code used to send turned out unnecessary (every row in the
   series is already representative-rate data) and was removed. `fetch_history` for this source
   is now implemented, using the confirmed standard SDMX `startPeriod`/`endPeriod` params.
+- VATComply (ENH-018, 2026-11-01): **confirmed live.** `api.vatcomply.com/rates` (no key, 2 req/s
+  per IP) accepts `base`/`symbols`/`date` params and returns the same `date`/`base`/`rates` shape
+  as Frankfurter; confirmed against a live call for both the latest rate and a specific historical
+  date. It has no start/end range param - a tried `start_date`/`end_date` pair was silently
+  ignored - so `fetch_history` for this source issues one request per day in range instead of a
+  single ranged call.
 - Alpaca: the WS feed path (`iex`/`sip`) and sandbox URL are now confirmed via Alpaca's own docs.
   The REST historical-bars endpoint turned out **wrong** - the real endpoint is the multi-symbol
   `/v2/stocks/bars` (a `symbols` query param, not a path segment) with bars nested under
