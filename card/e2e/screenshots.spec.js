@@ -64,6 +64,15 @@ test("instrument card: stock kind shows a sparkline and previous close", async (
   await expect(card.locator(".value").first()).toHaveText("$150.52");
   await expect(card.locator(".stat-label")).toHaveText("Prev close");
   await expect(card.locator(".stat-value")).toHaveText("$148.20");
+
+  // Richer chart: filled area under the line, a "now" marker dot, and a
+  // min/max range label overlay.
+  await expect(card.locator(".big-spark svg path[fill-opacity]")).toHaveCount(1);
+  await expect(card.locator(".big-spark svg circle")).toHaveCount(1);
+  const rangeLabels = await card.locator(".spark-range span").allTextContents();
+  expect(rangeLabels).toHaveLength(2);
+  expect(rangeLabels[0]).toMatch(/^\$\d/); // max
+  expect(rangeLabels[1]).toMatch(/^\$\d/); // min
 });
 
 test("instrument card: fx kind shows the published date", async ({ page }) => {

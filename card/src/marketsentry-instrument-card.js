@@ -1,7 +1,7 @@
 import { formatChange, formatCompactUsd, formatDate, formatValue, marketStateLabel, statusBadge } from "./format.js";
 import { DATE_LOCALES, resolveLang, t } from "./i18n.js";
 import { buildRows, changeFromHistory } from "./rows.js";
-import { buildSparklinePath } from "./sparkline.js";
+import { buildSparklineArea, buildSparklinePath, sparklineLastPoint, sparklineRange } from "./sparkline.js";
 
 const HISTORY_REFRESH_MS = 60_000;
 
@@ -119,6 +119,9 @@ export class MarketSentryInstrumentCard extends HTMLElement {
   _renderGeneric(row, lang) {
     const { changePct, deltaPp } = changeFromHistory(this._history);
     const path = buildSparklinePath(this._history, 280, 60);
+    const areaPath = buildSparklineArea(this._history, 280, 60);
+    const lastPoint = sparklineLastPoint(this._history, 280, 60);
+    const range = sparklineRange(this._history);
     const changeText = formatChange(row.kind, changePct, deltaPp);
     const changeClass = (deltaPp ?? changePct ?? 0) >= 0 ? "positive" : "negative";
     const badgeId = statusBadge(row);
@@ -145,7 +148,23 @@ export class MarketSentryInstrumentCard extends HTMLElement {
         ${changeText ? `<span class="change ${changeClass}" dir="ltr">${escapeHtml(changeText)}</span>` : ""}
       </div>
       <div class="big-spark">
-        ${path ? `<svg viewBox="0 0 280 60" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" /></svg>` : ""}
+        ${
+          path
+            ? `<svg viewBox="0 0 280 60" preserveAspectRatio="none">
+                ${areaPath ? `<path d="${areaPath}" fill="currentColor" fill-opacity="0.12" stroke="none" />` : ""}
+                <path d="${path}" fill="none" stroke="currentColor" stroke-width="2" />
+                ${lastPoint ? `<circle cx="${lastPoint.x.toFixed(1)}" cy="${lastPoint.y.toFixed(1)}" r="3" fill="currentColor" />` : ""}
+              </svg>`
+            : ""
+        }
+        ${
+          range && range.max !== range.min
+            ? `<div class="spark-range" dir="ltr">
+                <span>${escapeHtml(formatValue(row.kind, range.max, row.unit))}</span>
+                <span>${escapeHtml(formatValue(row.kind, range.min, row.unit))}</span>
+              </div>`
+            : ""
+        }
       </div>
       ${row.kind === "stock" ? `<div class="stats"><div class="stat"><span class="stat-label">${escapeHtml(t(lang, "stat_prev_close"))}</span><span class="stat-value" dir="ltr">${escapeHtml(formatValue(row.kind, row.previousClose, row.unit))}</span></div></div>` : ""}
       ${row.kind === "fx" ? `<div class="footer">${escapeHtml(t(lang, "footer_published", { date: formatDate(row.publishedDate, DATE_LOCALES[lang]) }))}</div>` : ""}
@@ -223,8 +242,20 @@ const STYLE = `
   .change { font-size: 0.95rem; font-variant-numeric: tabular-nums; }
   .change.positive { color: var(--success-color, #4caf50); }
   .change.negative { color: var(--error-color, #f44336); }
-  .big-spark { width: 100%; height: 60px; color: var(--primary-color); }
+  .big-spark { position: relative; width: 100%; height: 60px; color: var(--primary-color); }
   .big-spark svg { width: 100%; height: 100%; display: block; }
+  .spark-range {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 2px 0;
+    pointer-events: none;
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+  }
   .stats { display: flex; gap: 20px; margin-top: 2px; }
   .stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-label { font-size: 0.72rem; color: var(--secondary-text-color); text-transform: uppercase; }
