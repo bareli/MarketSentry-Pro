@@ -4,10 +4,10 @@
   "codeowners": ["@bareli"],
   "config_flow": true,
   "dependencies": ["http"],
-  "documentation": "https://github.com/bareli/Polymarket-Manager-Pro",
+  "documentation": "https://github.com/bareli/MarketSentry-Pro",
   "integration_type": "service",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/bareli/Polymarket-Manager-Pro/issues",
+  "issue_tracker": "https://github.com/bareli/MarketSentry-Pro/issues",
   "requirements": [],
   "version": "0.3.0"
 }
