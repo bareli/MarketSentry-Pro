@@ -27,6 +27,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.loader import async_get_integration
 
 from .api import PolymarketApiClient
 from .const import (
@@ -173,12 +174,16 @@ async def async_setup(hass: HomeAssistant, _config: Any) -> bool:
 
     card_file = Path(__file__).parent / "www" / "marketsentry-card.js"
     if card_file.exists():
-        url_path = f"/{DOMAIN}_static/marketsentry-card.js"
+        static_path = f"/{DOMAIN}_static/marketsentry-card.js"
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(url_path, str(card_file), cache_headers=False)]
+            [StaticPathConfig(static_path, str(card_file), cache_headers=False)]
         )
         if "frontend" in hass.config.components:
-            add_extra_js_url(hass, url_path)
+            # Cache-bust on every release: without a version query string,
+            # browsers keep serving an old cached copy of this module after
+            # an update until the user manually hard-reloads.
+            integration = await async_get_integration(hass, DOMAIN)
+            add_extra_js_url(hass, f"{static_path}?v={integration.version}")
         else:
             # frontend isn't set up (e.g. a minimal/test environment); the
             # static file is still served, it just won't auto-register as a
