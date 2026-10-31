@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Een instrument volgen",
-          "description": "Plak een URL/slug (Polymarket), ticker (aandelen) of paar zoals EUR/ILS (FX; voeg /boi toe voor de officiële koers van de Bank of Israel in plaats van de marktkoers). Vrije tekst werkt ook als zoekopdracht.",
+          "description": "Plak een URL/slug (Polymarket), ticker (aandelen, bijv. AAPL, MSFT, TSLA), munt-id (crypto, bijv. bitcoin, ethereum) of paar zoals EUR/ILS (FX; voeg /boi toe voor de officiële koers van de Bank of Israel in plaats van de marktkoers). Vrije tekst werkt ook als zoekopdracht.",
           "data": {
             "url_or_query": "URL, ticker of paar"
           }
