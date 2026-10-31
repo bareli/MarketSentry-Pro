@@ -27,7 +27,11 @@ BLUEPRINT_PATH = BLUEPRINTS_DIR / "notify_on_event.yaml"
 def _default_message(trigger: dict[str, Any]) -> str:
     blueprint = load_blueprint(BLUEPRINT_PATH)
     substituted = substitute_inputs(blueprint, blueprint, inputs={})
-    message_template = substituted["action"][0]["data"]["message"]
+    # ENH-016 wrapped the original `action: !input notify_action` in a new
+    # "is this automation currently snoozed" if-block (see
+    # test_enh016_actionable_notifications.py) - `notify_action`'s own
+    # default content, and this test's assertion about it, are unchanged.
+    message_template = substituted["action"][1]["then"][0]["data"]["message"]
     return render_template(message_template, MockRegistry(), context={"trigger": trigger})
 
 

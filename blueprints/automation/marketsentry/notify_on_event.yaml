@@ -6,6 +6,11 @@ blueprint:
     market-open gap, official rate published) and run your own notification
     action. The trigger's full event data (name, symbol, old, new, delta,
     url, ...) is available in your action as `trigger.event.data`.
+
+    Optionally, also send a separate actionable mobile-app notification with
+    an "Open dashboard" button, and a "Snooze" button that silences this
+    automation for a while - both off by default and independent of your
+    notification action above.
   domain: automation
   input:
     market_trigger:
@@ -31,7 +36,91 @@ blueprint:
               {{ trigger.event.data.new }}
       selector:
         action: {}
+    mobile_notify_target:
+      name: Phone for actionable notification (optional)
+      description: >-
+        Leave empty to skip. If set, also sends a mobile-app notification
+        with an "Open dashboard" button (and a "Snooze" button, if a snooze
+        helper below is configured too) - independent of the notification
+        action above.
+      default: ""
+      selector:
+        entity:
+          domain: notify
+    snooze_hours:
+      name: Snooze duration in hours (optional)
+      description: >-
+        How long tapping the Snooze button silences this automation (both
+        the notification action above and the actionable notification).
+        Needs a snooze helper below; 0 disables the Snooze button.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 168
+          step: 1
+          unit_of_measurement: h
+    snooze_helper:
+      name: Snooze helper (optional)
+      description: >-
+        An `input_boolean` helper dedicated to this automation (create one
+        under Settings > Devices & services > Helpers, one per automation
+        built from this blueprint). While it is on, this automation stays
+        silent. Leave empty to disable snoozing.
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
 
-trigger: !input market_trigger
+trigger:
+  - triggers: !input market_trigger
+  - id: marketsentry_snooze
+    platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: !input snooze_helper
 
-action: !input notify_action
+variables:
+  mobile_notify_target: !input mobile_notify_target
+  snooze_hours: !input snooze_hours
+  snooze_helper: !input snooze_helper
+  notify_actions: >-
+    {{ [{"action": "URI", "title": "Open dashboard", "uri": "/config/integrations/integration/marketsentry"}] +
+       ([{"action": snooze_helper, "title": "Snooze " ~ (snooze_hours | int) ~ "h"}]
+        if (snooze_hours | float(0)) > 0 and snooze_helper not in [none, ""] else []) }}
+
+action:
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id == 'marketsentry_snooze' }}"
+    then:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: !input snooze_helper
+      - delay:
+          hours: "{{ snooze_hours }}"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: !input snooze_helper
+  - if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id != 'marketsentry_snooze' and
+             (snooze_helper in [none, ""] or not is_state(snooze_helper, 'on')) }}
+    then: !input notify_action
+  - if:
+      - condition: template
+        value_template: >-
+          {{ trigger.id != 'marketsentry_snooze' and
+             mobile_notify_target not in [none, ""] and
+             (snooze_helper in [none, ""] or not is_state(snooze_helper, 'on')) }}
+    then:
+      - action: notify.send_message
+        target:
+          entity_id: !input mobile_notify_target
+        data:
+          message: >-
+            {{ trigger.event.data.name }}: {{ trigger.event.data.old }} ->
+            {{ trigger.event.data.new }}
+          data:
+            actions: "{{ notify_actions }}"

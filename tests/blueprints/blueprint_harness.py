@@ -56,6 +56,13 @@ Two things a blueprint YAML needs that a plain `yaml.safe_load` /
    - `device_name(entity_id)` -> the entity's device's `name_by_user or
      name`, or `None` if the entity has no device, or isn't registered at
      all.
+
+   ENH-016 added a fourth: `is_state(entity_id, state)` -> `True` if the
+   entity is currently in exactly that state, `False` otherwise (including
+   when the entity doesn't exist at all - real HA returns `False` rather
+   than raising for an unknown/malformed entity id, which is what the
+   snooze-helper condition in both `notify_on_event.yaml` and
+   `resolved_announce.yaml` relies on for the "no helper configured" case).
 """
 
 from __future__ import annotations
@@ -196,6 +203,14 @@ class MockRegistry:
             return None
         return device.name_by_user or device.name
 
+    def is_state(self, entity_id: Any, state: str) -> bool:
+        if not isinstance(entity_id, str):
+            return False
+        found = self.states.get(entity_id)
+        if found is None:
+            return False
+        return found.state == state
+
 
 def build_environment(registry: MockRegistry) -> jinja2.Environment:
     """A `jinja2.Environment` with the HA template globals these blueprints
@@ -210,6 +225,7 @@ def build_environment(registry: MockRegistry) -> jinja2.Environment:
     env.globals["expand"] = registry.expand
     env.globals["integration_entities"] = registry.integration_entities
     env.globals["device_name"] = registry.device_name
+    env.globals["is_state"] = registry.is_state
     return env
 
 
