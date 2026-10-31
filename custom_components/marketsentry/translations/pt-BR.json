@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Confirmar e definir limites",
-          "description": "Acompanhando **{name}** ({symbol}).",
+          "description": "Acompanhando **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Limites (separados por vírgula)",
             "hysteresis": "Histerese",

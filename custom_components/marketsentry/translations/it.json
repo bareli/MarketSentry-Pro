@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Conferma e imposta le soglie",
-          "description": "Seguendo **{name}** ({symbol}).",
+          "description": "Seguendo **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Soglie (separate da virgola)",
             "hysteresis": "Isteresi",

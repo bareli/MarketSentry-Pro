@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Confirmer et définir les seuils",
-          "description": "Suivi de **{name}** ({symbol}).",
+          "description": "Suivi de **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Seuils (séparés par des virgules)",
             "hysteresis": "Hystérésis",

@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Confirm and set thresholds",
-          "description": "Tracking **{name}** ({symbol}).",
+          "description": "Tracking **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Thresholds (comma-separated)",
             "hysteresis": "Hysteresis",

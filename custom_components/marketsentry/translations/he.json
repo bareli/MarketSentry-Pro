@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "אישור והגדרת ספים",
-          "description": "מעקב אחרי **{name}** ({symbol}).",
+          "description": "מעקב אחרי **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "ספים (מופרדים בפסיקים)",
             "hysteresis": "היסטרזיס",

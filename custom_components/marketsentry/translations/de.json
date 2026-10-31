@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Bestätigen und Schwellenwerte festlegen",
-          "description": "Verfolge **{name}** ({symbol}).",
+          "description": "Verfolge **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Schwellenwerte (durch Komma getrennt)",
             "hysteresis": "Hysterese",

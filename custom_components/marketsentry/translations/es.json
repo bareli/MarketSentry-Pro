@@ -58,7 +58,7 @@
         },
         "confirm": {
           "title": "Confirmar y establecer umbrales",
-          "description": "Siguiendo **{name}** ({symbol}).",
+          "description": "Siguiendo **{name}** ({symbol}).{volatility_hint}",
           "data": {
             "thresholds": "Umbrales (separados por comas)",
             "hysteresis": "Histéresis",
