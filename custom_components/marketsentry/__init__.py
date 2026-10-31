@@ -3,8 +3,8 @@
 One config entry = one provider account (Polymarket/FX need no credentials;
 Finnhub/Alpaca do). Each tracked instrument is a config *subentry* under
 that entry, so adding/removing instruments never re-asks for credentials.
-Subentry changes trigger Home Assistant's default reload-the-entry
-behavior, so `async_setup_entry` always rebuilds its trackers from
+Subentry changes trigger a reload of the entry (via an update listener),
+so `async_setup_entry` always rebuilds its trackers from
 `entry.subentries` rather than patching them in place.
 """
 
@@ -247,7 +247,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry)
     await async_setup_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> None:
+    """Reload the entry so trackers/entities are rebuilt from entry.subentries.
+
+    Adding/removing/editing an instrument subentry only updates the entry's
+    data; Home Assistant does not re-run async_setup_entry on its own, so
+    without this listener a new instrument never gets its entities created.
+    """
+    hass.config_entries.async_schedule_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:

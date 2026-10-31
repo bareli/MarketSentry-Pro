@@ -7,6 +7,7 @@ from unittest.mock import patch
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from custom_components.marketsentry.const import CONF_PROVIDER, DOMAIN, SUBENTRY_TYPE_INSTRUMENT
 from custom_components.marketsentry.providers.base import CannotConnect, InstrumentRef, InvalidAuth
@@ -200,6 +201,46 @@ async def test_instrument_subentry_duplicate_aborts(hass: HomeAssistant) -> None
         )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_adding_instrument_subentry_reloads_entry_and_creates_entities(
+    hass: HomeAssistant,
+) -> None:
+    """Adding a subentry must reload the entry so sensor.py actually runs for it.
+
+    Regression test: async_setup_entry rebuilds trackers from entry.subentries,
+    but without an update listener HA never re-invokes it after a subentry is
+    added, so the new instrument silently got zero entities.
+    """
+    entry = await _create_finnhub_entry(hass)
+    ref = _ref()
+
+    with (
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+            return_value=[ref],
+        ),
+        patch(
+            "custom_components.marketsentry.providers.finnhub.FinnhubProvider.fetch_snapshot",
+            return_value={},
+        ),
+    ):
+        result = await hass.config_entries.subentries.async_init(
+            (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+        )
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done()
+
+    entity_registry = er.async_get(hass)
+    entries_for_entry = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+    assert any((e.unique_id or "").endswith("_price") for e in entries_for_entry)
 
 
 async def test_instrument_subentry_reconfigure_updates_options(hass: HomeAssistant) -> None:
