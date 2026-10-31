@@ -74,6 +74,11 @@ owner's real instance can flash a real light or send a real notification).
     executed against a live/CI `hass` templating engine this session (no browser/live-instance
     access per the brief) - the above is a documented-behavior-based code review, not an execution
     result; flag for an actual live render if the owner wants certainty beyond this.
+  - **Updated 2026-10-31 (ENH-006, issue #16, closed):** the digest line now prefers
+    `device_name(s.entity_id)` over the raw `s.attributes.friendly_name`, falling back to
+    `friendly_name` when the entity has no device or `device_name()` returns `None`. Hand-traced
+    against a real `jinja2.Environment` with a mocked `device_name()` - fallback and the
+    empty-`tracked` branch both confirmed unaffected. See `qa/bugs/ENH-006.md` for the full trace.
   - **Reviewed 2026-10-31 (qa-ux-expert), usability angle, code review only - the Jinja-helper-
     enumeration question itself stays UNVERIFIED against live HA templating per qa-engineer's note
     above; this is the readability question only.** The per-line format is fine for stock/crypto/fx
