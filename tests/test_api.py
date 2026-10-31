@@ -36,6 +36,93 @@ def test_parse_polymarket_url_or_slug_rejects_garbage_url() -> None:
         parse_polymarket_url_or_slug("https://polymarket.com/")
 
 
+def test_parse_polymarket_url_or_slug_rejects_bad_path_prefix() -> None:
+    with pytest.raises(ValueError):
+        parse_polymarket_url_or_slug("foo/bar")
+
+
+async def _client_for(aiohttp_client, path: str, handler) -> PolymarketApiClient:
+    app = web.Application()
+    app.router.add_get(path, handler)
+    client = await aiohttp_client(app)
+    import custom_components.marketsentry.api as api_module
+
+    base_url = str(client.make_url("")).rstrip("/")
+    api_module.GAMMA_BASE_URL = base_url
+    api_module.CLOB_BASE_URL = base_url
+    api_module.DATA_API_BASE_URL = base_url
+    return PolymarketApiClient(client.session)
+
+
+async def test_get_event_by_slug(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"id": "1", "slug": "some-event", "markets": []})
+
+    api = await _client_for(aiohttp_client, "/events/slug/some-event", handler)
+    event = await api.get_event_by_slug("some-event")
+    assert event["slug"] == "some-event"
+
+
+async def test_search_markets_returns_markets_key_from_dict_response(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        assert request.query["q"] == "election"
+        assert request.query["limit"] == "5"
+        return web.json_response({"markets": [{"slug": "a"}, {"slug": "b"}]})
+
+    api = await _client_for(aiohttp_client, "/public-search", handler)
+    results = await api.search_markets("election", limit=5)
+    assert [r["slug"] for r in results] == ["a", "b"]
+
+
+async def test_search_markets_handles_bare_list_response(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response([{"slug": "a"}])
+
+    api = await _client_for(aiohttp_client, "/public-search", handler)
+    results = await api.search_markets("election")
+    assert results == [{"slug": "a"}]
+
+
+async def test_get_price_parses_float_response(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        assert request.query["side"] == "BUY"
+        return web.json_response({"price": 0.42})
+
+    api = await _client_for(aiohttp_client, "/price", handler)
+    price = await api.get_price("tok1", "BUY")
+    assert price == 0.42
+
+
+async def test_get_book_returns_raw_dict(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"bids": [], "asks": [], "tick_size": "0.01"})
+
+    api = await _client_for(aiohttp_client, "/book", handler)
+    book = await api.get_book("tok1")
+    assert book["tick_size"] == "0.01"
+
+
+async def test_get_price_history_with_fidelity(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        assert request.query["market"] == "tok1"
+        assert request.query["fidelity"] == "60"
+        return web.json_response({"history": [{"t": 1, "p": 0.5}]})
+
+    api = await _client_for(aiohttp_client, "/prices-history", handler)
+    history = await api.get_price_history("tok1", interval="1d", fidelity=60)
+    assert history == [{"t": 1, "p": 0.5}]
+
+
+async def test_get_resolution_returns_raw_dict(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        assert request.query["condition"] == "0xabc"
+        return web.json_response({"status": "resolved"})
+
+    api = await _client_for(aiohttp_client, "/v2/resolutions", handler)
+    resolution = await api.get_resolution("0xabc")
+    assert resolution["status"] == "resolved"
+
+
 async def test_get_midpoint_parses_string_price(aiohttp_client) -> None:
     async def handler(request: web.Request) -> web.Response:
         assert request.query["token_id"] == "abc"

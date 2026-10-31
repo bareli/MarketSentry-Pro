@@ -135,3 +135,60 @@ async def test_fetch_history_frankfurter_parses_time_series(aiohttp_client) -> N
 
     assert len(points) == 2
     assert points[1].price == 3.90
+
+
+async def test_search_delegates_to_resolve(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"amount": 1.0, "base": "EUR", "date": "2026-10-30", "rates": {"ILS": 3.91}})
+
+    app = web.Application()
+    app.router.add_get("/frankfurter/latest", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    refs = await provider.search("EUR/ILS", limit=10)
+    assert refs[0].id == "frankfurter:EUR:ILS"
+
+
+async def test_search_returns_empty_on_cannot_connect(aiohttp_client) -> None:
+    app = web.Application()
+    provider = await _provider_for(aiohttp_client, app)
+
+    assert await provider.search("not-a-pair", limit=10) == []
+
+
+async def test_frankfurter_quote_raises_when_rate_missing(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"amount": 1.0, "base": "EUR", "date": "2026-10-30", "rates": {}})
+
+    app = web.Application()
+    app.router.add_get("/frankfurter/latest", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="frankfurter:EUR:ILS", symbol="EUR/ILS", name="EUR/ILS", kind="fx", unit="ILS")
+    quotes = await provider.fetch_snapshot([ref])
+    assert quotes == {}
+
+
+async def test_boi_quote_raises_when_obs_value_missing(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.Response(text="TIME_PERIOD\n2026-10-29\n", content_type="text/csv")
+
+    app = web.Application()
+    app.router.add_get("/boi/RER_USD_ILS", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="fx", id="boi:USD:ILS", symbol="USD/ILS", name="USD/ILS", kind="fx", unit="ILS")
+    quotes = await provider.fetch_snapshot([ref])
+    assert quotes == {}
+
+
+async def test_boi_fetch_latest_raises_when_no_rows(aiohttp_client) -> None:
+    async def handler(request: web.Request) -> web.Response:
+        return web.Response(text="TIME_PERIOD,OBS_VALUE\n", content_type="text/csv")
+
+    app = web.Application()
+    app.router.add_get("/boi/RER_USD_ILS", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    with pytest.raises(CannotConnect):
+        await provider.resolve("USD/ILS/boi")
