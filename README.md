@@ -145,6 +145,25 @@ One row per tracked instrument: live value, a sparkline, a status badge
 Updated today/Stale for FX), and a link out where one exists (Polymarket,
 stock provider page; none for FX). Configurable via the UI editor too.
 
+## Auto-dashboard view (no manual card placement)
+
+Add a new view to any dashboard and set it to generate itself instead of
+hand-placing cards: edit the dashboard (pencil icon) > Add view > switch
+the view to YAML mode (3-dot menu) and set it to:
+
+```yaml
+strategy:
+  type: custom:marketsentry
+  # title: My Markets      # optional, defaults to "Markets"
+  # group_by: kind         # optional: none | provider | kind
+  # kinds: [stock]         # optional filter; omit to include everything
+```
+
+The view fills itself with the `marketsentry-card` overview plus one
+`marketsentry-instrument-card` per tracked instrument, and reflects
+instruments you add or remove the next time the view loads - no manual
+card placement, ever.
+
 ## Services
 
 - `marketsentry.get_price_history` — historical price points for one tracked instrument (device, hours). Returns response data.
@@ -238,3 +257,9 @@ these in production:
   the `c[DATA_TYPE]=OF00` filter syntax — taken from BOI's own published
   guide, not a live test call. `fetch_history` for this source isn't
   implemented yet, pending that verification.
+- The `custom:marketsentry` dashboard view strategy (`ll-strategy-view-marketsentry`):
+  built against the documented HA view-strategy contract
+  (`static generate(config, hass)` on a custom element named
+  `ll-strategy-view-<type>`) and covered by a unit test of its card-building
+  logic, but not smoke-tested against a running HA frontend's actual
+  strategy-resolution wiring in this project.
