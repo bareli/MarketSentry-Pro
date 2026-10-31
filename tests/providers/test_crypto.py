@@ -30,7 +30,7 @@ async def test_resolve_exact_coin_id(aiohttp_client) -> None:
     assert refs[0].symbol == "BTC"
     assert refs[0].kind == "crypto"
     assert refs[0].unit == "USD"
-    assert refs[0].name == "Bitcoin (BTC)"
+    assert refs[0].name == "Bitcoin"
     assert refs[0].url == "https://www.coingecko.com/en/coins/bitcoin"
 
 

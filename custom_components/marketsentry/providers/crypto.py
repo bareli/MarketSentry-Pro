@@ -60,7 +60,7 @@ def _ref_from_coin(coin: dict[str, Any]) -> InstrumentRef:
         provider="coingecko",
         id=coin_id,
         symbol=symbol,
-        name=f"{coin['name']} ({symbol})",
+        name=coin["name"],
         kind="crypto",
         unit="USD",
         url=f"https://www.coingecko.com/en/coins/{coin_id}",
