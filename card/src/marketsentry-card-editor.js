@@ -3,6 +3,7 @@ import { resolveLang, t } from "./i18n.js";
 const KIND_OPTIONS = [
   { value: "outcome", labelKey: "group_predictions" },
   { value: "stock", labelKey: "group_stocks" },
+  { value: "crypto", labelKey: "group_crypto" },
   { value: "fx", labelKey: "group_fx" },
 ];
 

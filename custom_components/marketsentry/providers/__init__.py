@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from .alpaca import AlpacaProvider
 from .base import Provider
+from .crypto import CryptoProvider
 from .finnhub import FinnhubProvider
 from .fx import FxProvider
 from .polymarket import PolymarketProvider
@@ -20,6 +21,7 @@ PROVIDERS: dict[str, type[Provider]] = {
     "finnhub": FinnhubProvider,
     "alpaca": AlpacaProvider,
     "fx": FxProvider,
+    "coingecko": CryptoProvider,
 }
 
 
@@ -36,6 +38,8 @@ def build_provider(session: ClientSession, provider_key: str, data: dict[str, An
         )
     if provider_key == "fx":
         return FxProvider(session)
+    if provider_key == "coingecko":
+        return CryptoProvider(session)
     return PolymarketProvider(session)
 
 

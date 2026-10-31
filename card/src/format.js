@@ -82,5 +82,8 @@ export function statusBadge(row, now = new Date()) {
     const published = new Date(row.publishedDate);
     return published.toDateString() === now.toDateString() ? "updated_today" : "stale";
   }
+  if (row.kind === "crypto") {
+    return "live"; // trades 24/7, no open/closed session to report
+  }
   return "";
 }

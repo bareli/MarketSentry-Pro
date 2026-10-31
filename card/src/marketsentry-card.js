@@ -6,7 +6,7 @@ import { buildSparklinePath } from "./sparkline.js";
 
 const HISTORY_REFRESH_MS = 60_000;
 
-const PROVIDER_NAMES = { polymarket: "Polymarket", finnhub: "Finnhub", alpaca: "Alpaca" };
+const PROVIDER_NAMES = { polymarket: "Polymarket", finnhub: "Finnhub", alpaca: "Alpaca", coingecko: "CoinGecko" };
 
 export class MarketSentryCard extends HTMLElement {
   static getConfigElement() {
@@ -99,6 +99,7 @@ export class MarketSentryCard extends HTMLElement {
     if (this._config.group_by === "kind") {
       if (value === "outcome") return t(lang, "group_predictions");
       if (value === "stock") return t(lang, "group_stocks");
+      if (value === "crypto") return t(lang, "group_crypto");
       if (value === "fx") return t(lang, "group_fx");
     }
     return value;

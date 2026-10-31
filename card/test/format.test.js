@@ -136,4 +136,8 @@ describe("statusBadge", () => {
   it("fx: no published date shows stale", () => {
     expect(statusBadge({ kind: "fx", publishedDate: null }, now)).toBe("stale");
   });
+
+  it("crypto: always shows live (trades 24/7)", () => {
+    expect(statusBadge({ kind: "crypto" }, now)).toBe("live");
+  });
 });

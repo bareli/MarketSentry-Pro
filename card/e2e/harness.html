@@ -44,6 +44,7 @@
 <marketsentry-card id="card"></marketsentry-card>
 <marketsentry-instrument-card id="instrument-outcome"></marketsentry-instrument-card>
 <marketsentry-instrument-card id="instrument-stock"></marketsentry-instrument-card>
+<marketsentry-instrument-card id="instrument-crypto"></marketsentry-instrument-card>
 <marketsentry-instrument-card id="instrument-fx"></marketsentry-instrument-card>
 <script type="module">
   import "../../custom_components/marketsentry/www/marketsentry-card.js";
@@ -122,6 +123,12 @@
         device_id: "dev3",
         translation_key: "rate",
       },
+      "sensor.btc_price": {
+        entity_id: "sensor.btc_price",
+        platform: "marketsentry",
+        device_id: "dev4",
+        translation_key: "price",
+      },
     },
     devices: {
       dev1: {
@@ -131,6 +138,7 @@
       },
       dev2: { id: "dev2", name: "AAPL Inc", name_by_user: null },
       dev3: { id: "dev3", name: "EUR/ILS (market rate)", name_by_user: null },
+      dev4: { id: "dev4", name: "Bitcoin (BTC)", name_by_user: null },
     },
     states: {
       "sensor.yes_probability": {
@@ -162,6 +170,10 @@
           published_date: new Date().toISOString().slice(0, 10),
         },
       },
+      "sensor.btc_price": {
+        state: "67000.5",
+        attributes: { kind: "crypto", provider: "coingecko", unit_of_measurement: "USD" },
+      },
     },
     callWS: async () => ({ history }),
   };
@@ -178,6 +190,10 @@
   instrumentStock.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.aapl_price" });
   instrumentStock.hass = mockHass;
 
+  const instrumentCrypto = document.getElementById("instrument-crypto");
+  instrumentCrypto.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.btc_price" });
+  instrumentCrypto.hass = mockHass;
+
   const instrumentFx = document.getElementById("instrument-fx");
   instrumentFx.setConfig({ type: "custom:marketsentry-instrument-card", entity: "sensor.eur_ils_rate" });
   instrumentFx.hass = mockHass;
@@ -185,8 +201,8 @@
   // Signal readiness to Playwright once every card has rendered content.
   window.__cardReady = new Promise((resolve) => {
     const check = () => {
-      const listReady = card.shadowRoot && card.shadowRoot.querySelectorAll(".row").length >= 3;
-      const instrumentsReady = [instrumentOutcome, instrumentStock, instrumentFx].every(
+      const listReady = card.shadowRoot && card.shadowRoot.querySelectorAll(".row").length >= 4;
+      const instrumentsReady = [instrumentOutcome, instrumentStock, instrumentCrypto, instrumentFx].every(
         (el) => el.shadowRoot && el.shadowRoot.querySelector(".title")
       );
       if (listReady && instrumentsReady) {

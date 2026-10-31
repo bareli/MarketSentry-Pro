@@ -64,6 +64,8 @@ async def async_setup_entry(
             entities.append(PriceSensor(coordinator, entry.entry_id, tracker))
             entities.append(PreviousCloseSensor(coordinator, entry.entry_id, tracker))
             entities.append(MarketStateSensor(coordinator, entry.entry_id, tracker))
+        elif kind == "crypto":
+            entities.append(PriceSensor(coordinator, entry.entry_id, tracker))
         else:  # fx
             entities.append(RateSensor(coordinator, entry.entry_id, tracker))
 
