@@ -23,9 +23,10 @@ export class MarketSentryInstrumentCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config.entity) {
-      throw new Error("marketsentry-instrument-card: 'entity' is required");
-    }
+    // An empty/missing `entity` is not a malformed config - it's the
+    // first-run state (e.g. `getStubConfig()` on a zero-instrument
+    // account) and is handled at render time by `_render()`'s empty state,
+    // not rejected here.
     this._config = { ...config };
     this._render();
   }
@@ -75,10 +76,28 @@ export class MarketSentryInstrumentCard extends HTMLElement {
       <style>${STYLE}</style>
       <ha-card>
         <div class="content">
-          ${row ? this._renderBody(row, lang) : `<div class="empty">${escapeHtml(t(lang, "empty_instrument", { entity: this._config.entity }))}</div>`}
+          ${row ? this._renderBody(row, lang) : this._renderEmpty(lang)}
         </div>
       </ha-card>
     `;
+  }
+
+  /**
+   * No matching row. Split on whether an entity was configured at all:
+   * - no `entity` configured yet (e.g. the zero-instrument stub config) -
+   *   point the user back at the integration's own "Add instrument" step.
+   * - a real-but-unmatched `entity` id - keep the specific "not found" text.
+   */
+  _renderEmpty(lang) {
+    if (!this._config.entity) {
+      return `
+        <div class="empty">
+          ${escapeHtml(t(lang, "empty_instrument_no_entity"))}
+          <a href="/config/integrations/integration/marketsentry">${escapeHtml(t(lang, "empty_instrument_add_instrument"))}</a>.
+        </div>
+      `;
+    }
+    return `<div class="empty">${escapeHtml(t(lang, "empty_instrument", { entity: this._config.entity }))}</div>`;
   }
 
   _renderBody(row, lang) {
@@ -200,6 +219,7 @@ const STYLE = `
   ha-card { padding: 16px; }
   .content { display: flex; flex-direction: column; gap: 10px; }
   .empty { color: var(--secondary-text-color); }
+  .empty a { color: var(--primary-color); }
   .title {
     font-size: 1.1rem;
     font-weight: 600;
@@ -255,6 +275,11 @@ const STYLE = `
     pointer-events: none;
     font-size: 0.68rem;
     color: var(--secondary-text-color);
+  }
+  .spark-range span {
+    background: var(--card-background-color);
+    border-radius: 4px;
+    padding: 1px 4px;
   }
   .stats { display: flex; gap: 20px; margin-top: 2px; }
   .stat { display: flex; flex-direction: column; gap: 2px; }
