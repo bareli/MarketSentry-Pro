@@ -139,9 +139,11 @@ Whenever a provider module, `config_flow.py`, `__init__.py`'s detector/snapshot 
 
 - FX's Bank of Israel source has no `fetch_history` implementation (returns `[]`) - documented in
   README as pending SDMX date-range-filter verification, not a bug.
-- The card's "change" column is a rough first-point-vs-last-point figure from the sparkline ring
-  buffer, explicitly not the precise windowed value the backend detectors use to fire events -
-  documented in README, not a bug if the two numbers disagree slightly.
+- (Resolved by ENH-009, issue #19) The list card's "change" column used to be a rough first-point-
+  vs-last-point figure from the sparkline ring buffer; it now reads the backend's real `change_pp`/
+  `change_pct` sensor attribute directly. The single-instrument detail card
+  (`marketsentry-instrument-card.js`) still has the old sparkline-approximation pattern - out of
+  ENH-009's stated scope, flagged as a possible follow-up, not yet filed.
 - `stream_connected` binary sensor is an approximation ("the stream task is running"), not a
   live per-reconnect up/down signal - documented, not a bug.
 - Several provider API facts (Finnhub WS shapes, Alpaca feed paths, Frankfurter base URL, BOI's
