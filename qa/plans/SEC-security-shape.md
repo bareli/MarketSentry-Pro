@@ -14,9 +14,11 @@ single-user integration.
   calling user's own instance data (not cross-entry, though there's only one HA instance so this
   is mostly a "did someone add a parameter that leaks another entry's device_id" check).
 - **SEC-03** Diagnostics download redacts Finnhub `api_key` and both Alpaca `key_id` +
-  `secret_key` - grep the actual redaction list in `diagnostics.py` against every credential key
-  name in `const.py` (`CONF_API_KEY`, `CONF_KEY_ID`, `CONF_SECRET_KEY`) to confirm none was missed
-  when a new provider's credential shape was added.
+  `secret_key`. CODE-VERIFIED 2026-10-31 (no live HA needed): `diagnostics.py`'s
+  `TO_REDACT = {CONF_API_KEY, CONF_KEY_ID, CONF_SECRET_KEY}` covers all three fields and is applied
+  via `async_redact_data(dict(entry.data), TO_REDACT)` to the only place credentials appear in the
+  diagnostics payload. Re-check this set whenever a provider adds a new credential field (e.g. a
+  future provider needing an API secret beyond a single key).
 - **SEC-04** No credential value (`api_key`/`key_id`/`secret_key`) ever reaches `_LOGGER` at any
   level, including debug - grep for any log call that interpolates `user_input`/`data`/`entry.data`
   wholesale rather than specific non-secret fields.
