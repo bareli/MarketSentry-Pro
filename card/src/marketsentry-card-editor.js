@@ -11,7 +11,16 @@ export class MarketSentryCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { group_by: "none", kinds: undefined, ...config };
+    const next = { group_by: "none", kinds: undefined, ...config };
+    const nextKey = JSON.stringify(next);
+    // HA's card editor dialog calls setConfig() again every time we emit
+    // config-changed (even for our own edits), echoing back the same
+    // config. Rebuilding the whole shadow DOM on that echo would blow
+    // away focus/cursor position on every keystroke, so skip it when
+    // nothing actually changed.
+    if (this._configKey === nextKey) return;
+    this._config = next;
+    this._configKey = nextKey;
     this._render();
   }
 
@@ -24,6 +33,7 @@ export class MarketSentryCardEditor extends HTMLElement {
   }
 
   _emitChange() {
+    this._configKey = JSON.stringify(this._config);
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: this._config },

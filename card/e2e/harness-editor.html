@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>marketsentry-card-editor harness</title>
+<style>
+  :root {
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --card-background-color: #fff;
+    --secondary-background-color: #f0f0f0;
+    --divider-color: #e0e0e0;
+  }
+  body { margin: 0; padding: 24px; font-family: Roboto, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<marketsentry-card-editor id="editor"></marketsentry-card-editor>
+<marketsentry-instrument-card-editor id="instrument-editor"></marketsentry-instrument-card-editor>
+<script type="module">
+  import "../../custom_components/marketsentry/www/marketsentry-card.js";
+
+  const mockHass = {
+    entities: {
+      "sensor.yes_probability": {
+        entity_id: "sensor.yes_probability",
+        platform: "marketsentry",
+        device_id: "dev1",
+        translation_key: "probability",
+      },
+      "sensor.aapl_price": {
+        entity_id: "sensor.aapl_price",
+        platform: "marketsentry",
+        device_id: "dev2",
+        translation_key: "price",
+      },
+    },
+    devices: {
+      dev1: { id: "dev1", name: "Will X happen?: Yes", name_by_user: null },
+      dev2: { id: "dev2", name: "AAPL Inc", name_by_user: null },
+    },
+    states: {
+      "sensor.yes_probability": { state: "62.3", attributes: { kind: "outcome" } },
+      "sensor.aapl_price": { state: "150.5", attributes: { kind: "stock", unit_of_measurement: "USD" } },
+    },
+  };
+
+  // Mimics HA's card-config-editor dialog: on every config-changed event
+  // from the editor, store the config and feed it straight back via
+  // setConfig(), exactly like the real dialog does on every keystroke.
+  function wireEchoBack(el, initialConfig) {
+    let config = initialConfig;
+    el.setConfig(config);
+    el.hass = mockHass;
+    el.addEventListener("config-changed", (ev) => {
+      config = ev.detail.config;
+      el.setConfig(config);
+    });
+  }
+
+  const editor = document.getElementById("editor");
+  wireEchoBack(editor, { type: "custom:marketsentry-card", group_by: "none" });
+
+  const instrumentEditor = document.getElementById("instrument-editor");
+  wireEchoBack(instrumentEditor, { type: "custom:marketsentry-instrument-card", entity: "" });
+
+  window.__editorsReady = new Promise((resolve) => {
+    const check = () => {
+      if (
+        editor.shadowRoot?.querySelector('input[type="text"]') &&
+        instrumentEditor.shadowRoot?.querySelector("select")
+      ) {
+        resolve();
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  });
+</script>
+</body>
+</html>

@@ -7,12 +7,28 @@ export class MarketSentryInstrumentCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { ...config };
+    const next = { ...config };
+    const nextKey = JSON.stringify(next);
+    // HA's card editor dialog calls setConfig() again every time we emit
+    // config-changed (even for our own edits), echoing back the same
+    // config. Rebuilding the shadow DOM on that echo would close an open
+    // <select> or steal focus, so skip it when nothing actually changed.
+    if (this._configKey === nextKey) return;
+    this._config = next;
+    this._configKey = nextKey;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    // `hass` is replaced on every state update (every few seconds), far
+    // more often than the list of trackable instruments actually changes.
+    // Only rebuild the dropdown when that list has actually changed, so a
+    // dropdown the user has open doesn't get yanked shut underneath them.
+    const rows = buildRows(hass);
+    const rowsKey = JSON.stringify(rows.map((row) => [row.entityId, row.name]));
+    if (this._rowsKey === rowsKey) return;
+    this._rowsKey = rowsKey;
     this._render();
   }
 
@@ -21,6 +37,7 @@ export class MarketSentryInstrumentCardEditor extends HTMLElement {
   }
 
   _emitChange() {
+    this._configKey = JSON.stringify(this._config);
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: this._config },
