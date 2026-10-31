@@ -14,6 +14,7 @@ blueprint:
         trigger: {}
     flash_light:
       name: Light to flash (optional)
+      description: Leave empty to skip the light flash.
       default: []
       selector:
         target:
@@ -21,6 +22,7 @@ blueprint:
             domain: light
     tts_target:
       name: Media player for announcement (optional)
+      description: Leave empty to skip the spoken announcement (also needs a TTS engine below).
       default: []
       selector:
         target:
@@ -37,6 +39,9 @@ blueprint:
 trigger: !input market_trigger
 
 variables:
+  flash_light: !input flash_light
+  tts_target: !input tts_target
+  tts_entity: !input tts_entity
   outcome_name: "{{ trigger.event.data.name }}"
   winning_outcome: "{{ trigger.event.data.winning_outcome }}"
 
