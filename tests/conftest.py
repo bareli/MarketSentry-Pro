@@ -16,16 +16,47 @@ fake-server tests (test_api.py, test_ws.py, providers/test_*.py) need for
 their local test servers. Requesting the `socket_enabled` fixture
 re-enables sockets for the duration of a test; doing it autouse here
 covers every test module without touching each test's signature.
+
+Both pytest-aiohttp and pytest-homeassistant-custom-component provide a
+fixture named `aiohttp_client`, and once both plugins are active (as in
+CI, where sockets aren't blocked so pytest-homeassistant-custom-component
+fully loads) the one that wins shadows ours unpredictably - and HA's
+version raised "Timeout context manager should be used inside a task"
+for every request, since it isn't meant for standalone aiohttp testing
+outside of a `hass` instance. Defining our own `aiohttp_client` fixture
+here (a root conftest fixture always takes precedence over a
+plugin-provided one of the same name) removes the ambiguity for every
+test in the tree without changing any test file.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Awaitable, Callable
+
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestClient, TestServer
 
 
 @pytest.fixture(autouse=True)
 def _allow_sockets_for_local_test_servers(socket_enabled: None) -> None:
     """No-op body: requesting `socket_enabled` is what re-enables sockets."""
+
+
+@pytest.fixture
+async def aiohttp_client() -> AsyncIterator[Callable[[web.Application], Awaitable[TestClient]]]:
+    clients: list[TestClient] = []
+
+    async def _make_client(app: web.Application) -> TestClient:
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        clients.append(client)
+        return client
+
+    yield _make_client
+
+    for client in clients:
+        await client.close()
 
 
 GAMMA_MARKET_FIXTURE = {
