@@ -42,6 +42,15 @@ owner's real instance can flash a real light or send a real notification).
     resolution event - the documented "leave empty to skip" default is broken, not merely an edge
     case. No live HA instance was touched to produce this evidence (out of scope this session);
     the proof is the exact Jinja/HA source + a matching standalone render, not a guess.
+  - **Reviewed 2026-10-31 (qa-ux-expert), usability angle, code review only - never imported into
+    live HA this session, filed before seeing qa-engineer's BUG-004 above.** Separately from
+    BUG-004's binding defect: even taken at face value (as working, skippable fields), the
+    in-form wording for "optional, skippable" is inconsistent across the three inputs -
+    `tts_entity` explicitly says "Leave empty to skip the spoken announcement,"
+    `flash_light`/`tts_target` rely only on "(optional)" in the field *name* with no description
+    at all. **UX-002 filed** (issue #5, LOW, `qa:awaiting-decision`). This wording gap is
+    independent of BUG-004 and stays relevant once BUG-004 is fixed and the fields are genuinely
+    skippable again.
 - **BP-03** `daily_digest.yaml`: `integration_entities('marketsentry')` + `expand()` +
   `selectattr('attributes.kind', 'defined')` actually enumerates every tracked primary sensor on a
   real instance (this exact combination of Jinja helpers was never run against live HA templating
@@ -65,3 +74,15 @@ owner's real instance can flash a real light or send a real notification).
     executed against a live/CI `hass` templating engine this session (no browser/live-instance
     access per the brief) - the above is a documented-behavior-based code review, not an execution
     result; flag for an actual live render if the owner wants certainty beyond this.
+  - **Reviewed 2026-10-31 (qa-ux-expert), usability angle, code review only - the Jinja-helper-
+    enumeration question itself stays UNVERIFIED against live HA templating per qa-engineer's note
+    above; this is the readability question only.** The per-line format is fine for stock/crypto/fx
+    but not for a Polymarket outcome mixed in - its `friendly_name` is the full market question
+    (every MarketSentry Pro entity sets `_attr_has_entity_name = True`, `entity.py:63`, so
+    `friendly_name` = device name + entity name, and for an outcome the device name IS the market
+    question), producing a line roughly 5x longer than the others and dominating a push
+    notification's visible area. **UX-003 filed** (issue #6, MEDIUM, `qa:awaiting-decision`) with
+    a hand-traced four-line example using the project's own realistic mock data
+    (`card/e2e/harness.html`) and `sensor.py`'s unit definitions - not a live Jinja run (no
+    `jinja2` package available offline without stubbing HA internals; `Evidence unavailable`
+    reasoning documented in the finding).
