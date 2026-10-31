@@ -202,6 +202,6 @@ PROVIDER_MANUFACTURER: Final[dict[str, str]] = {
     "polymarket": "Polymarket (unofficial)",
     "finnhub": "Finnhub (unofficial)",
     "alpaca": "Alpaca (unofficial)",
-    "fx": "Frankfurter / Bank of Israel (unofficial)",
+    "fx": "Frankfurter / Bank of Israel / VATComply (unofficial)",
     "coingecko": "CoinGecko (unofficial)",
 }

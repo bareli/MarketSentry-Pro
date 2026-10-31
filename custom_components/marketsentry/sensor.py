@@ -419,7 +419,13 @@ class RateSensor(InstrumentEntity, SensorEntity):
         )
         return {
             **card_attributes(self._tracker.ref),
-            "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
+            "source": (
+                "official (Bank of Israel)"
+                if source == "boi"
+                else "market (VATComply)"
+                if source == "vatcomply"
+                else "market (Frankfurter)"
+            ),
             "published_date": quote.ts.date().isoformat() if quote.ts else None,
             # The exact windowed change (%) DailyChangeDetector uses to
             # decide whether to fire `daily_change` - not a card-side

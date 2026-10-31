@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Ein Instrument verfolgen",
-          "description": "URL/Slug (Polymarket), Ticker (Aktien, z. B. AAPL, MSFT, TSLA), Coin-ID (Krypto, z. B. bitcoin, ethereum) oder Paar wie EUR/ILS einfügen (FX; /boi anhängen für den offiziellen Kurs der Bank of Israel statt des Marktkurses). Freitext funktioniert auch als Suche.",
+          "description": "URL/Slug (Polymarket), Ticker (Aktien, z. B. AAPL, MSFT, TSLA), Coin-ID (Krypto, z. B. bitcoin, ethereum) oder Paar wie EUR/ILS einfügen (FX; /boi anhängen für den offiziellen Kurs der Bank of Israel, oder /vatcomply für eine alternative Marktkurs-Quelle, statt des Standard-Marktkurses). Freitext funktioniert auch als Suche.",
           "data": {
             "url_or_query": "URL, Ticker oder Paar"
           }

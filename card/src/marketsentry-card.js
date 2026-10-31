@@ -179,7 +179,17 @@ export class MarketSentryCard extends HTMLElement {
                   `<span class="chip">${escapeHtml(t(lang, `chip_${marketStateLabel(row.marketState)}`))}</span>`
                 : ""
             }
-            ${row.kind === "fx" ? `<span class="chip">${escapeHtml(row.source === "boi" || /boi/.test(row.source || "") ? t(lang, "fx_boi") : t(lang, "fx_market"))}</span>` : ""}
+            ${
+              row.kind === "fx"
+                ? `<span class="chip">${escapeHtml(
+                    row.source === "boi" || /boi/.test(row.source || "")
+                      ? t(lang, "fx_boi")
+                      : row.source === "vatcomply" || /vatcomply/.test(row.source || "")
+                        ? t(lang, "fx_vatcomply")
+                        : t(lang, "fx_market")
+                  )}</span>`
+                : ""
+            }
             ${row.kind !== "stock" ? `<span class="badge badge-${slug(badgeId)}">${escapeHtml(badge)}</span>` : ""}
           </div>
           <div class="row-spark">

@@ -1,4 +1,4 @@
-"""FX provider: exchange rates from two sources, no API key for either.
+"""FX provider: exchange rates from three sources, no API key for any.
 
 - Frankfurter (ECB-based market mid rate, frankfurter.dev): daily rates,
   wide currency coverage, no key. **Confirmed live (ENH-008, 2026-10-31)**:
@@ -21,11 +21,25 @@
   queries use the standard SDMX `startPeriod`/`endPeriod` params, also
   confirmed live - `fetch_history()` for BOI is now implemented (previously
   returned `[]` unconditionally, pending this verification).
+- VATComply (ECB-sourced market rate, api.vatcomply.com, madisvain/vatcomply):
+  added for redundancy alongside Frankfurter (ENH-018, D-037) - an
+  independently-hosted service, no key, no rate-limit auth, 2 req/s per IP.
+  **Confirmed live (ENH-018, 2026-11-01)** against `https://www.vatcomply.com/
+  api/exchange-rates/`: `GET /rates` (default base EUR) with optional
+  `base`/`symbols`/`date` (YYYY-MM-DD) query params, returning
+  `{"date":"...","base":"EUR","rates":{"ILS":3.91,...}}` - confirmed
+  verbatim via a live call. Only a single `date` is supported per request
+  (no start/end range param - an extra `start_date`/`end_date` pair was
+  tried live and silently ignored, returning the latest rate instead), so
+  `fetch_history()` for this source issues one request per day in range,
+  unlike Frankfurter's single ranged call.
 
 Instrument id convention: "<source>:<base_ccy>:<quote_ccy>", source is
-"frankfurter" or "boi", e.g. "frankfurter:EUR:ILS" or "boi:USD:ILS" (BOI
-rates are always vs ILS). resolve() accepts "EUR/ILS" (-> frankfurter,
-market mid) or "EUR/ILS/boi" (-> Bank of Israel official rate).
+"frankfurter", "boi" or "vatcomply", e.g. "frankfurter:EUR:ILS",
+"boi:USD:ILS" or "vatcomply:EUR:ILS" (BOI rates are always vs ILS).
+resolve() accepts "EUR/ILS" (-> frankfurter, market mid), "EUR/ILS/boi"
+(-> Bank of Israel official rate) or "EUR/ILS/vatcomply" (-> VATComply
+market rate).
 """
 
 from __future__ import annotations
@@ -33,7 +47,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout
@@ -44,6 +58,7 @@ _LOGGER = logging.getLogger(__name__)
 
 FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 BOI_SDMX_BASE_URL = "https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0"
+VATCOMPLY_BASE_URL = "https://api.vatcomply.com"
 
 _REQUEST_TIMEOUT = ClientTimeout(total=15)
 
@@ -54,7 +69,7 @@ def _parse_pair(ref_id: str) -> tuple[str, str, str]:
 
 
 class FxProvider(Provider):
-    """Exchange rates: Frankfurter (market mid) or Bank of Israel (official)."""
+    """Exchange rates: Frankfurter/VATComply (market mid) or Bank of Israel (official)."""
 
     key = "fx"
     name = "Exchange rates"
@@ -65,7 +80,7 @@ class FxProvider(Provider):
         self._session = session
 
     async def validate(self, credentials: dict[str, Any]) -> None:
-        return  # no API key for either source
+        return  # no API key for any source
 
     async def search(self, query: str, limit: int) -> list[InstrumentRef]:
         try:
@@ -78,14 +93,23 @@ class FxProvider(Provider):
         if len(parts) < 2:
             raise CannotConnect(f"Expected a pair like EUR/ILS, got: {user_input}")
         base_ccy, quote_ccy = parts[0], parts[1]
-        source = "boi" if len(parts) >= 3 and parts[2].lower() == "boi" else "frankfurter"
+        suffix = parts[2].lower() if len(parts) >= 3 else ""
+        source = "boi" if suffix == "boi" else "vatcomply" if suffix == "vatcomply" else "frankfurter"
 
         if source == "frankfurter":
             await self._frankfurter_get("/latest", {"base": base_ccy, "symbols": quote_ccy})
-        else:
+        elif source == "boi":
             await self._boi_fetch_latest(base_ccy)
+        else:
+            await self._vatcomply_fetch_latest(base_ccy, quote_ccy)
 
-        label = "Bank of Israel official rate" if source == "boi" else "market rate"
+        label = (
+            "Bank of Israel official rate"
+            if source == "boi"
+            else "VATComply market rate"
+            if source == "vatcomply"
+            else "market rate"
+        )
         return [
             InstrumentRef(
                 provider="fx",
@@ -104,8 +128,10 @@ class FxProvider(Provider):
             try:
                 if source == "frankfurter":
                     quotes[ref.id] = await self._frankfurter_quote(base_ccy, quote_ccy)
-                else:
+                elif source == "boi":
                     quotes[ref.id] = await self._boi_quote(base_ccy)
+                else:
+                    quotes[ref.id] = await self._vatcomply_quote(base_ccy, quote_ccy)
             except CannotConnect as err:
                 _LOGGER.debug("FX snapshot failed for %s: %s", ref.id, err)
         return quotes
@@ -116,8 +142,10 @@ class FxProvider(Provider):
         end = datetime.now(UTC).date()
         start = end.fromordinal(end.toordinal() - days)
 
-        if source != "frankfurter":
+        if source == "boi":
             return await self._boi_fetch_history(base_ccy, start, end)
+        if source == "vatcomply":
+            return await self._vatcomply_fetch_history(base_ccy, quote_ccy, start, end)
 
         data = await self._frankfurter_get(
             f"/{start.isoformat()}..{end.isoformat()}", {"base": base_ccy, "symbols": quote_ccy}
@@ -204,4 +232,48 @@ class FxProvider(Provider):
             points.append(
                 PricePoint(ts=datetime.fromisoformat(date_str).replace(tzinfo=UTC), price=float(rate))
             )
+        return points
+
+    # --- VATComply ---
+
+    async def _vatcomply_get(self, params: dict[str, Any]) -> Any:
+        url = f"{VATCOMPLY_BASE_URL}/rates"
+        try:
+            async with self._session.get(url, params=params, timeout=_REQUEST_TIMEOUT) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except Exception as err:  # noqa: BLE001
+            raise CannotConnect(f"VATComply request failed: {err}") from err
+
+    async def _vatcomply_fetch_latest(self, base_ccy: str, quote_ccy: str) -> Any:
+        return await self._vatcomply_get({"base": base_ccy, "symbols": quote_ccy})
+
+    async def _vatcomply_quote(self, base_ccy: str, quote_ccy: str) -> Quote:
+        data = await self._vatcomply_fetch_latest(base_ccy, quote_ccy)
+        rate = data.get("rates", {}).get(quote_ccy) if isinstance(data, dict) else None
+        if rate is None:
+            raise CannotConnect(f"No VATComply rate for {base_ccy}/{quote_ccy}")
+        date_str = data.get("date")
+        ts = datetime.fromisoformat(date_str).replace(tzinfo=UTC) if date_str else datetime.now(UTC)
+        return Quote(price=float(rate), ts=ts)
+
+    async def _vatcomply_fetch_history(
+        self, base_ccy: str, quote_ccy: str, start: date, end: date
+    ) -> list[PricePoint]:
+        # VATComply has no start/end range param (confirmed live, ENH-018 -
+        # a tried start_date/end_date pair was silently ignored, returning
+        # the latest rate instead) - one request per day in range, unlike
+        # Frankfurter's single ranged call.
+        points: list[PricePoint] = []
+        day = start
+        while day <= end:
+            data = await self._vatcomply_get(
+                {"base": base_ccy, "symbols": quote_ccy, "date": day.isoformat()}
+            )
+            rate = data.get("rates", {}).get(quote_ccy) if isinstance(data, dict) else None
+            if rate is not None:
+                points.append(
+                    PricePoint(ts=datetime.combine(day, datetime.min.time(), tzinfo=UTC), price=float(rate))
+                )
+            day += timedelta(days=1)
         return points

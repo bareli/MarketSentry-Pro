@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Segui uno strumento",
-          "description": "Incolla un URL/slug (Polymarket), un ticker (azioni, ad es. AAPL, MSFT, TSLA), un id moneta (crypto, ad es. bitcoin, ethereum) o una coppia come EUR/ILS (FX; aggiungi /boi per il tasso ufficiale della Banca d'Israele invece del tasso di mercato). Funziona anche il testo libero come ricerca.",
+          "description": "Incolla un URL/slug (Polymarket), un ticker (azioni, ad es. AAPL, MSFT, TSLA), un id moneta (crypto, ad es. bitcoin, ethereum) o una coppia come EUR/ILS (FX; aggiungi /boi per il tasso ufficiale della Banca d'Israele, oppure /vatcomply per una fonte di tasso di mercato alternativa, invece del tasso di mercato predefinito). Funziona anche il testo libero come ricerca.",
           "data": {
             "url_or_query": "URL, ticker o coppia"
           }

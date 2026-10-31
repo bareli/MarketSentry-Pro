@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Acompanhar um instrumento",
-          "description": "Cole uma URL/slug (Polymarket), um ticker (ações, ex.: AAPL, MSFT, TSLA), um id de moeda (cripto, ex.: bitcoin, ethereum) ou um par como EUR/ILS (câmbio; adicione /boi para a taxa oficial do Banco de Israel em vez da taxa de mercado). Texto livre também funciona como busca.",
+          "description": "Cole uma URL/slug (Polymarket), um ticker (ações, ex.: AAPL, MSFT, TSLA), um id de moeda (cripto, ex.: bitcoin, ethereum) ou um par como EUR/ILS (câmbio; adicione /boi para a taxa oficial do Banco de Israel, ou /vatcomply para uma fonte alternativa de taxa de mercado, em vez da taxa de mercado padrão). Texto livre também funciona como busca.",
           "data": {
             "url_or_query": "URL, ticker ou par"
           }
