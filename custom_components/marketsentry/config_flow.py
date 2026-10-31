@@ -255,7 +255,10 @@ def _notify_dashboard_strategy(hass: HomeAssistant) -> None:
             "strategy:\n"
             "  type: custom:marketsentry\n"
             "```\n\n"
-            "It fills itself with every instrument you track, no manual card placement."
+            "It fills itself with every instrument you track, no manual card placement.\n\n"
+            "[Open your default dashboard in edit mode](/lovelace/0?edit=1) to jump "
+            "straight to the **+ Add view** button instead of finding the pencil icon "
+            "yourself."
         ),
         notification_id=DASHBOARD_STRATEGY_NOTIFICATION_ID,
     )

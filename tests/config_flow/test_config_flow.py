@@ -189,6 +189,36 @@ async def test_first_instrument_ever_notifies_dashboard_strategy(hass: HomeAssis
     assert mock_notify.call_args.kwargs["notification_id"] == "marketsentry_dashboard_strategy"
 
 
+async def test_dashboard_strategy_notification_includes_add_view_link(hass: HomeAssistant) -> None:
+    """ENH-013: the notification deep-links to the default dashboard's edit/add-view screen."""
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref()],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+
+    with patch(
+        "custom_components.marketsentry.config_flow.async_create_notification"
+    ) as mock_notify:
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    mock_notify.assert_called_once()
+    message = mock_notify.call_args.kwargs["message"]
+    assert "/lovelace/0?edit=1" in message
+    assert "Add view" in message
+
+
 async def test_second_instrument_does_not_renotify(hass: HomeAssistant) -> None:
     entry = await _create_finnhub_entry(hass)
     ref1 = _ref()
