@@ -243,21 +243,29 @@ pass, run live in a real headless Chromium this session. Not wired into
 the Python CI workflow (separate `card-ci.yml`, Vitest only — Playwright
 needs a browser download, see `card/README.md` for known gaps).
 
-**API facts flagged as unverified in each provider's module docstring**
-(a research-fetch tool failed this session on most sources; one, Alpaca's
-streaming-market-data page, was confirmed live). Verify before relying on
-these in production:
-- Finnhub: WS subscribe/trade message shapes, REST `/quote` and `/search`
-  field names, free-tier WS symbol limit (~30).
-- Alpaca: the exact stream feed path/value (`iex` vs `sip`), trade message
-  field names (the quote message shape WAS confirmed live), REST
-  market-data endpoint paths, free-tier WS symbol limit.
-- Frankfurter: base URL (`api.frankfurter.dev/v1` vs the older `.app`
-  domain), `base`/`symbols` vs `from`/`to` parameter names.
-- Bank of Israel: the SDMX series-key format (assumed `RER_<CCY>_ILS`) and
-  the `c[DATA_TYPE]=OF00` filter syntax — taken from BOI's own published
-  guide, not a live test call. `fetch_history` for this source isn't
-  implemented yet, pending that verification.
+**API facts, verification status per provider** (ENH-008, 2026-10-31, confirmed what could be
+confirmed without an owner account on a third-party service):
+- Frankfurter: **confirmed live.** Base URL `api.frankfurter.dev/v1` is correct and canonical
+  (the older `.app` domain 301-redirects to it); `base`/`symbols` params and the response shape
+  all confirmed against real calls.
+- Bank of Israel: **confirmed live.** The `RER_<CCY>_ILS` series-key convention is correct; the
+  `c[DATA_TYPE]=OF00` filter this code used to send turned out unnecessary (every row in the
+  series is already representative-rate data) and was removed. `fetch_history` for this source
+  is now implemented, using the confirmed standard SDMX `startPeriod`/`endPeriod` params.
+- Alpaca: the WS feed path (`iex`/`sip`) and sandbox URL are now confirmed via Alpaca's own docs.
+  The REST historical-bars endpoint turned out **wrong** - the real endpoint is the multi-symbol
+  `/v2/stocks/bars` (a `symbols` query param, not a path segment) with bars nested under
+  `{"bars": {"<symbol>": [...]}}`, not `/v2/stocks/{symbol}/bars` returning a flat list; this
+  would have thrown at runtime (iterating dict keys as bar objects) and is now fixed. Trade
+  message field names and the free-tier WS symbol limit remain unconfirmed (no trade-message
+  example exists in Alpaca's own current streaming-market-data docs).
+- Finnhub: still unconfirmed by a live call - no API key available this session, Finnhub's
+  published "demo" token no longer works, and this agent won't create an account on the owner's
+  behalf. The documented WS/REST shapes are corroborated against independent, actively-maintained
+  third-party sources (a real consumer project's message schema, a maintained API client's
+  response model) that match this file's assumptions exactly, which is a secondary-source match,
+  not a live Finnhub response - get a free key and verify directly before relying on it in
+  production.
 - CoinGecko: the free `/search`, `/coins/{id}`, `/simple/price`, and
   `/coins/{id}/market_chart` endpoints and their response shapes — built
   against CoinGecko's long-documented public v3 contract, not a live test

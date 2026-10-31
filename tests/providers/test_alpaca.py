@@ -105,13 +105,27 @@ async def test_fetch_snapshot_one_bad_ref_should_not_drop_the_others(aiohttp_cli
 
 
 async def test_fetch_history_parses_bars(aiohttp_client) -> None:
+    """ENH-008 regression: Alpaca's real historical-bars endpoint is the multi-symbol
+    /v2/stocks/bars (symbols= query param), and nests bars under {"bars": {"<symbol>": [...]}} -
+    not /v2/stocks/{symbol}/bars with a flat list, which this test used to assert. Confirmed
+    against docs.alpaca.markets live, 2026-10-31 - see providers/alpaca.py's module docstring."""
+
     async def handler(request: web.Request) -> web.Response:
+        assert request.query["symbols"] == "AAPL"
         return web.json_response(
-            {"bars": [{"t": "2026-01-01T15:00:00Z", "c": 150.0}, {"t": "2026-01-01T16:00:00Z", "c": 151.0}]}
+            {
+                "bars": {
+                    "AAPL": [
+                        {"t": "2026-01-01T15:00:00Z", "c": 150.0},
+                        {"t": "2026-01-01T16:00:00Z", "c": 151.0},
+                    ]
+                },
+                "next_page_token": None,
+            }
         )
 
     app = web.Application()
-    app.router.add_get("/stocks/AAPL/bars", handler)
+    app.router.add_get("/stocks/bars", handler)
     provider = await _provider_for(aiohttp_client, app)
 
     ref = InstrumentRef(provider="alpaca", id="AAPL", symbol="AAPL", name="AAPL", kind="stock", unit="USD")
@@ -119,6 +133,32 @@ async def test_fetch_history_parses_bars(aiohttp_client) -> None:
 
     assert len(points) == 2
     assert points[1].price == 151.0
+
+
+async def test_fetch_history_ignores_other_symbols_in_a_shared_response(aiohttp_client) -> None:
+    """The multi-symbol endpoint's response could in principle carry other symbols' bars
+    (not requested here, since fetch_history only ever asks for one at a time) - confirm only
+    the requested ref's bars are read, by key, not by position or a flattened merge."""
+
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "bars": {
+                    "AAPL": [{"t": "2026-01-01T15:00:00Z", "c": 150.0}],
+                    "MSFT": [{"t": "2026-01-01T15:00:00Z", "c": 999.0}],
+                }
+            }
+        )
+
+    app = web.Application()
+    app.router.add_get("/stocks/bars", handler)
+    provider = await _provider_for(aiohttp_client, app)
+
+    ref = InstrumentRef(provider="alpaca", id="AAPL", symbol="AAPL", name="AAPL", kind="stock", unit="USD")
+    points = await provider.fetch_history(ref, hours=24)
+
+    assert len(points) == 1
+    assert points[0].price == 150.0
 
 
 async def test_connect_and_listen_auths_then_dispatches_quote(aiohttp_client) -> None:

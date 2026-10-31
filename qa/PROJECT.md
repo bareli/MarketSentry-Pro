@@ -137,8 +137,9 @@ Whenever a provider module, `config_flow.py`, `__init__.py`'s detector/snapshot 
 
 ## Deliberate behaviour
 
-- FX's Bank of Israel source has no `fetch_history` implementation (returns `[]`) - documented in
-  README as pending SDMX date-range-filter verification, not a bug.
+- (Resolved by ENH-008) FX's Bank of Israel source's `fetch_history` is now implemented
+  (confirmed live SDMX `startPeriod`/`endPeriod` params) - used to unconditionally return `[]`
+  pending that verification.
 - (Resolved by ENH-009, issue #19) The list card's "change" column used to be a rough first-point-
   vs-last-point figure from the sparkline ring buffer; it now reads the backend's real `change_pp`/
   `change_pct` sensor attribute directly. The single-instrument detail card
@@ -146,11 +147,13 @@ Whenever a provider module, `config_flow.py`, `__init__.py`'s detector/snapshot 
   ENH-009's stated scope, flagged as a possible follow-up, not yet filed.
 - `stream_connected` binary sensor is an approximation ("the stream task is running"), not a
   live per-reconnect up/down signal - documented, not a bug.
-- Several provider API facts (Finnhub WS shapes, Alpaca feed paths, Frankfurter base URL, BOI's
-  SDMX series-key format, CoinGecko's endpoints) are explicitly flagged in code/README as
-  unverified against live docs this project's sessions - treat a mismatch with the real API as a
-  "needs verification" finding, not automatically a regression, and check `qa/knowledge/` /
-  README before filing.
+- (ENH-008, 2026-10-31) Frankfurter and Bank of Israel facts are now confirmed live; Alpaca's
+  stream feed path is confirmed live and its REST bars endpoint was found wrong and fixed (see
+  `qa/bugs/ENH-008.md`). Finnhub's facts remain unconfirmed by a live call (no API key available
+  to this agent, demo token no longer works) - corroborated only via independent third-party
+  sources. CoinGecko's endpoints remain unverified against live docs. Treat a mismatch with the
+  real API as a "needs verification" finding, not automatically a regression, and check
+  `qa/knowledge/` / README before filing.
 
 ## Legal frame
 

@@ -1,28 +1,26 @@
 """FX provider: exchange rates from two sources, no API key for either.
 
 - Frankfurter (ECB-based market mid rate, frankfurter.dev): daily rates,
-  wide currency coverage, no key. Facts below are NOT confirmed this
-  session (the research fetch tooling failed on frankfurter.dev); they
-  match Frankfurter's long-documented stable contract. Verify before
-  relying on them: base URL `https://api.frankfurter.dev/v1`, endpoints
-  `/latest`, `/{date}`, `/{start}..{end}`, `/currencies`, params
-  `base`/`symbols`, response `{"amount":1.0,"base":"EUR","date":"...",
-  "rates":{"ILS":3.91,...}}`.
+  wide currency coverage, no key. **Confirmed live (ENH-008, 2026-10-31)**:
+  base URL `https://api.frankfurter.dev/v1` is correct and canonical (the
+  older `.app` domain 301-redirects to it); `/latest`, `/{start}..{end}`
+  and `/currencies` all respond exactly as documented, with `base`/`symbols`
+  params and the `{"amount":1.0,"base":"EUR","date":"...",
+  "rates":{"ILS":3.91,...}}` response shape confirmed verbatim.
 - Bank of Israel official representative rate (שער יציג): published once
   per foreign-currency business day, vs ILS, "an indicator... no
-  obligatory status under law" per BOI. NOT confirmed this session either
-  (same tooling failure). Per BOI's own published guide
-  (boi.org.il, "extracting representative exchange rates from the new
-  series database"), the SDMX endpoint is under
-  `https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/dataflow/
-  BOI.STATISTICS/EXR/1.0/<series_key>` filtered to `DATA_TYPE=OF00`
-  (representative rates only - not every rate in the database is
-  representative), with `format=csv` for a simple CSV response. The
-  series-key naming convention (assumed `RER_<CCY>_ILS`, e.g.
-  `RER_USD_ILS`) is inferred from the guide's example `RER_GBP_ILS` and
-  is NOT independently verified. Confirm the exact key format and
-  dimension-filter syntax (`c[DATA_TYPE]=OF00`) against a live query
-  before relying on this in production.
+  obligatory status under law" per BOI. **Confirmed live (ENH-008,
+  2026-10-31)**: `https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/
+  dataflow/BOI.STATISTICS/EXR/1.0/<series_key>` with the guessed series-key
+  convention `RER_<CCY>_ILS` (e.g. `RER_USD_ILS`) returns real, current
+  representative-rate rows with `format=csv` alone - every row already
+  carries `DATA_TYPE=OF00` without needing a filter. The `c[DATA_TYPE]=OF00`
+  filter this module's code used to send is otherwise-harmless (aiohttp
+  percent-encodes the brackets and the server still returns 200), but
+  unnecessary - dropped it since the plain query already confirms. History
+  queries use the standard SDMX `startPeriod`/`endPeriod` params, also
+  confirmed live - `fetch_history()` for BOI is now implemented (previously
+  returned `[]` unconditionally, pending this verification).
 
 Instrument id convention: "<source>:<base_ccy>:<quote_ccy>", source is
 "frankfurter" or "boi", e.g. "frankfurter:EUR:ILS" or "boi:USD:ILS" (BOI
@@ -35,7 +33,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout
@@ -114,14 +112,13 @@ class FxProvider(Provider):
 
     async def fetch_history(self, ref: InstrumentRef, hours: int) -> list[PricePoint]:
         source, base_ccy, quote_ccy = _parse_pair(ref.id)
-        if source != "frankfurter":
-            # BOI's SDMX history query needs a confirmed date-range filter
-            # syntax this session could not verify; not implemented yet.
-            return []
-
         days = max(1, hours // 24) + 1
         end = datetime.now(UTC).date()
         start = end.fromordinal(end.toordinal() - days)
+
+        if source != "frankfurter":
+            return await self._boi_fetch_history(base_ccy, start, end)
+
         data = await self._frankfurter_get(
             f"/{start.isoformat()}..{end.isoformat()}", {"base": base_ccy, "symbols": quote_ccy}
         )
@@ -161,7 +158,7 @@ class FxProvider(Provider):
     async def _boi_fetch_latest(self, base_ccy: str) -> dict[str, Any]:
         series_key = f"RER_{base_ccy}_ILS"
         url = f"{BOI_SDMX_BASE_URL}/{series_key}"
-        params = {"c[DATA_TYPE]": "OF00", "format": "csv"}
+        params = {"format": "csv"}
         try:
             async with self._session.get(url, params=params, timeout=_REQUEST_TIMEOUT) as resp:
                 resp.raise_for_status()
@@ -182,3 +179,29 @@ class FxProvider(Provider):
             raise CannotConnect(f"Bank of Israel response missing OBS_VALUE for {base_ccy}/ILS")
         ts = datetime.fromisoformat(date_str).replace(tzinfo=UTC) if date_str else datetime.now(UTC)
         return Quote(price=float(rate), ts=ts)
+
+    async def _boi_fetch_history(self, base_ccy: str, start: date, end: date) -> list[PricePoint]:
+        series_key = f"RER_{base_ccy}_ILS"
+        url = f"{BOI_SDMX_BASE_URL}/{series_key}"
+        params = {
+            "format": "csv",
+            "startPeriod": start.isoformat(),
+            "endPeriod": end.isoformat(),
+        }
+        try:
+            async with self._session.get(url, params=params, timeout=_REQUEST_TIMEOUT) as resp:
+                resp.raise_for_status()
+                text = await resp.text()
+        except Exception as err:  # noqa: BLE001
+            raise CannotConnect(f"Bank of Israel history request for {base_ccy}/ILS failed: {err}") from err
+
+        points: list[PricePoint] = []
+        for row in csv.DictReader(io.StringIO(text)):
+            rate = row.get("OBS_VALUE")
+            date_str = row.get("TIME_PERIOD")
+            if rate is None or date_str is None:
+                continue
+            points.append(
+                PricePoint(ts=datetime.fromisoformat(date_str).replace(tzinfo=UTC), price=float(rate))
+            )
+        return points

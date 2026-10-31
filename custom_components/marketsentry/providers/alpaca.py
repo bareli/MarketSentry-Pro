@@ -3,7 +3,9 @@
 Requires an Alpaca API key ID + secret. IEX-only data on the free Basic
 plan is NOT the consolidated tape; label it as such in the UI.
 
-Facts confirmed this session by fetching docs.alpaca.markets/docs/streaming-market-data:
+Facts confirmed live (ENH-008, 2026-10-31) by fetching docs.alpaca.markets directly and, where
+docs alone were ambiguous, cross-checking against actively-maintained third-party client
+libraries (py-alpaca-api, the Elixir alpa_ex client) that call the same endpoints today:
 - Auth: {"action":"auth","key":KEY_ID,"secret":SECRET_KEY} -> reply
   [{"T":"success","msg":"authenticated"}]. Must auth within 10s of connecting.
 - Subscribe (additive): {"action":"subscribe","trades":[...],"quotes":[...],
@@ -12,17 +14,25 @@ Facts confirmed this session by fetching docs.alpaca.markets/docs/streaming-mark
   "ap":ask_price,"as":ask_size,"t":iso_timestamp,...}.
 - Error codes: 405 symbol limit exceeded, 406 connection limit exceeded
   (most accounts: 1 connection), 409 insufficient subscription.
+- WS feed path segment: literal "iex" or "sip" (`wss://stream.data.alpaca.markets/v2/iex` or
+  `/v2/sip`); sandbox variant is `wss://stream.data.sandbox.alpaca.markets/v2/{feed}`. Matches
+  `ALPACA_STREAM_URL_TEMPLATE` below exactly.
+- REST latest-quote/latest-trade: the single-symbol paths this code uses
+  (/v2/stocks/{symbol}/quotes/latest, /v2/stocks/{symbol}/trades/latest) are still actively called
+  by maintained third-party clients today - kept as-is.
+- REST historical bars: **was wrong, fixed this session.** The real endpoint is the multi-symbol
+  `/v2/stocks/bars` with a `symbols` query param (not `/v2/stocks/{symbol}/bars`), and the response
+  nests bars under `{"bars": {"<symbol>": [...]}}`, not a flat list - `fetch_history()` would have
+  thrown `AttributeError` iterating dict keys as bar objects. `fetch_history()` below now builds
+  the correct URL/params and extracts `bars_by_symbol[ref.id]`.
 
-NOT confirmed this session (fetch tooling failed on the remaining pages;
-these match Alpaca's long-documented public contract but verify at
-docs.alpaca.markets before relying on them):
-- The exact feed path segment ("iex" vs "sip") and sandbox URL.
-- The exact trade message field names (assumed "T":"t" with p/s/t/S, by
-  analogy with the confirmed quote shape).
-- REST market-data endpoints (/v2/stocks/{symbol}/quotes|trades/latest,
-  /v2/stocks/{symbol}/bars) - assumed from Alpaca's stable Market Data API v2.
-- The free-tier WS symbol limit (commonly cited as 30; only the error code
-  for exceeding it, 405, is confirmed).
+NOT independently confirmed (no Alpaca account available to this session to call live; corroborated
+only by the sources above, not Alpaca's own response):
+- The exact trade message field names (assumed "T":"t" with p/s/t/S, by analogy with the
+  confirmed quote shape - docs.alpaca.markets/docs/streaming-market-data shows quote and bar
+  message examples but not a trade one).
+- The free-tier WS symbol limit (commonly cited as 30; only the error code for exceeding it, 405,
+  is confirmed).
 """
 
 from __future__ import annotations
@@ -181,14 +191,16 @@ class AlpacaProvider(Provider):
         now = datetime.now(UTC)
         start = now.timestamp() - hours * 3600
         data = await self._get(
-            f"/stocks/{ref.id}/bars",
+            "/stocks/bars",
             {
+                "symbols": ref.id,
                 "timeframe": _bar_timeframe_for(hours),
                 "start": datetime.fromtimestamp(start, tz=UTC).isoformat(),
                 "end": now.isoformat(),
             },
         )
-        bars = data.get("bars", []) if isinstance(data, dict) else []
+        bars_by_symbol = data.get("bars", {}) if isinstance(data, dict) else {}
+        bars = bars_by_symbol.get(ref.id, []) if isinstance(bars_by_symbol, dict) else []
         points: list[PricePoint] = []
         for bar in bars:
             ts = _parse_iso(bar.get("t"))

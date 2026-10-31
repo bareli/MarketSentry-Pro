@@ -3,10 +3,15 @@
 Requires the user's own free API key (finnhub.io). Free tier is personal,
 non-commercial use only; respect that in the UI/README.
 
-API facts below were not confirmed against live docs in this session (the
-research fetch tooling failed); they match Finnhub's long-stable, widely
-documented public contract, but verify against https://finnhub.io/docs/api
-before relying on exact field names/limits in production:
+API facts below were NOT confirmed via a live authenticated call (ENH-008, 2026-10-31): no
+Finnhub API key was available this session, Finnhub's own published "demo" token no longer works
+(401 on /quote and /search), and creating a Finnhub account is out of scope for this agent to do
+on the owner's behalf. finnhub.io/docs/api is a JS-rendered SPA that fetch tooling cannot read
+either. They ARE corroborated against independent, actively-maintained third-party sources (a real
+consumer project's Avro schema for the WS trade message, the `finnhub_api` Elixir client's REST
+quote model) that match this file's assumptions exactly - a secondary-source match, not a live
+Finnhub response. Get a free API key and verify directly before relying on exact field names/
+limits in production:
 - WebSocket: wss://ws.finnhub.io?token=<key>; subscribe
   {"type":"subscribe","symbol":"AAPL"}; trade messages
   {"type":"trade","data":[{"p":price,"s":symbol,"t":ms,"v":volume,"c":[...]}]}.
