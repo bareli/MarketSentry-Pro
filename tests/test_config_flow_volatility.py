@@ -15,6 +15,7 @@ import pytest
 from custom_components.marketsentry.config_flow import (
     VOLATILITY_HINT_TIMEOUT_SEC,
     _async_volatility_hint,
+    _format_volatility_hint,
     _volatility_hint_pct,
 )
 from custom_components.marketsentry.providers.base import (
@@ -95,20 +96,41 @@ class _StubProvider(Provider):
 async def test_async_volatility_hint_renders_when_history_available() -> None:
     history = [_point(1, 100.0), _point(2, 102.0)]
     provider = _StubProvider(history=history)
-    hint = await _async_volatility_hint(provider, _ref("stock"))
+    hint = await _async_volatility_hint(provider, _ref("stock"), "en")
     assert "X moved ~2.0%" in hint
     assert "last week" in hint
 
 
+def test_format_volatility_hint_is_localized_per_language() -> None:
+    """ENH-017 follow-up: the sentence itself must be localized, not just the
+    {name}/{symbol} placeholders - a hardcoded English clause injected into
+    an otherwise-translated confirm dialog (e.g. Hebrew, this project's other
+    primary locale) would read as broken, mixed-language text."""
+    en = _format_volatility_hint("en", "X", 2.0, "%")
+    he = _format_volatility_hint("he", "X", 2.0, "%")
+    assert "moved" in en
+    assert "last week" in en
+    assert he != en
+    assert "X" in he and "2.0" in he
+
+
+def test_format_volatility_hint_falls_back_to_english_for_unknown_language() -> None:
+    assert _format_volatility_hint("xx", "X", 2.0, "%") == _format_volatility_hint("en", "X", 2.0, "%")
+
+
+def test_format_volatility_hint_is_case_insensitive_and_handles_region_variants() -> None:
+    assert _format_volatility_hint("PT-BR", "X", 2.0, "%") == _format_volatility_hint("pt-br", "X", 2.0, "%")
+
+
 async def test_async_volatility_hint_empty_when_provider_raises() -> None:
     provider = _StubProvider(error=CannotConnect("down"))
-    hint = await _async_volatility_hint(provider, _ref("stock"))
+    hint = await _async_volatility_hint(provider, _ref("stock"), "en")
     assert hint == ""
 
 
 async def test_async_volatility_hint_empty_when_provider_returns_too_little_data() -> None:
     provider = _StubProvider(history=[_point(1, 100.0)])
-    hint = await _async_volatility_hint(provider, _ref("stock"))
+    hint = await _async_volatility_hint(provider, _ref("stock"), "en")
     assert hint == ""
 
 
@@ -116,7 +138,7 @@ async def test_async_volatility_hint_empty_on_unexpected_error() -> None:
     # Anything a provider can raise - not just CannotConnect/InvalidAuth -
     # must degrade to no hint rather than bubble up into the confirm step.
     provider = _StubProvider(error=ValueError("boom"))
-    hint = await _async_volatility_hint(provider, _ref("stock"))
+    hint = await _async_volatility_hint(provider, _ref("stock"), "en")
     assert hint == ""
 
 
@@ -125,7 +147,7 @@ async def test_async_volatility_hint_empty_on_timeout() -> None:
         async def fetch_history(self, ref: InstrumentRef, hours: int) -> list[PricePoint]:
             raise TimeoutError("simulated slow provider")
 
-    hint = await _async_volatility_hint(_SlowProvider(), _ref("stock"))
+    hint = await _async_volatility_hint(_SlowProvider(), _ref("stock"), "en")
     assert hint == ""
     # Sanity: the bound is a real, short timeout - not accidentally disabled.
     assert 0 < VOLATILITY_HINT_TIMEOUT_SEC <= 10

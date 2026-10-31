@@ -147,7 +147,33 @@ def _volatility_hint_pct(points: list[PricePoint], kind: str) -> float | None:
     return sum(deltas) / len(deltas) if deltas else None
 
 
-async def _async_volatility_hint(provider: Provider, ref: InstrumentRef) -> str:
+# ENH-017: the hint's sentence, one per locale this project ships
+# translations for - the {symbol}/{value}/{unit} placeholders are filled
+# in by `_format_volatility_hint`, not by HA's own description_placeholders
+# substitution, so the clause itself is never left in English inside a
+# non-English confirm dialog. `unit` is kept as the universal finance
+# notation "%"/"pp" (percentage points) in every language rather than a
+# translated unit word, to avoid guessing per-language grammar for it.
+_VOLATILITY_HINT_TEMPLATE: dict[str, str] = {
+    "en": " {symbol} moved ~{value}{unit} on an average day over the last week.",
+    "he": " {symbol} השתנה בכ-{value}{unit} בממוצע ביום, בשבוע האחרון.",
+    "de": " {symbol} veränderte sich in der letzten Woche im Schnitt um ~{value}{unit} pro Tag.",
+    "fr": " {symbol} a varié d'environ {value}{unit} par jour en moyenne la semaine dernière.",
+    "es": " {symbol} varió en promedio ~{value}{unit} por día durante la última semana.",
+    "it": " {symbol} è variato in media di ~{value}{unit} al giorno nell'ultima settimana.",
+    "nl": " {symbol} veranderde de afgelopen week gemiddeld ~{value}{unit} per dag.",
+    "pt-br": " {symbol} variou em média ~{value}{unit} por dia na última semana.",
+}
+
+
+def _format_volatility_hint(language: str, symbol: str, value: float, unit: str) -> str:
+    template = _VOLATILITY_HINT_TEMPLATE.get(
+        language.lower(), _VOLATILITY_HINT_TEMPLATE["en"]
+    )
+    return template.format(symbol=symbol, value=f"{value:.1f}", unit=unit)
+
+
+async def _async_volatility_hint(provider: Provider, ref: InstrumentRef, language: str) -> str:
     """A one-line threshold-sizing hint for the confirm step's
     `description_placeholders`, or "" if none could be computed.
 
@@ -168,10 +194,8 @@ async def _async_volatility_hint(provider: Provider, ref: InstrumentRef) -> str:
     avg = _volatility_hint_pct(points, ref.kind)
     if avg is None:
         return ""
-    unit = "percentage points" if ref.kind == "outcome" else "%"
-    return (
-        f" {ref.symbol} moved ~{avg:.1f}{unit} on an average day over the last week."
-    )
+    unit = "pp" if ref.kind == "outcome" else "%"
+    return _format_volatility_hint(language, ref.symbol, avg, unit)
 
 
 def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
@@ -459,7 +483,9 @@ class InstrumentSubentryFlow(ConfigSubentryFlow):
             return self.async_create_entry(title=ref.name, data=data, unique_id=ref.id)
 
         schema = _options_schema(ref.kind, default_options_for_kind(ref.kind))
-        volatility_hint = await _async_volatility_hint(self._build_provider(), ref)
+        volatility_hint = await _async_volatility_hint(
+            self._build_provider(), ref, self.hass.config.language
+        )
         return self.async_show_form(
             step_id="confirm",
             data_schema=schema,
