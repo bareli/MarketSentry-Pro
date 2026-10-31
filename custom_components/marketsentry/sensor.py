@@ -127,7 +127,7 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "probability"
-    _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread", "change_pp"})
+    _attr_unrecorded_attributes = frozenset({"best_bid", "best_ask", "spread", "change_pp", "position_value"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -257,7 +257,7 @@ class PriceSensor(InstrumentEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "price"
-    _attr_unrecorded_attributes = frozenset({"change_pct"})
+    _attr_unrecorded_attributes = frozenset({"change_pct", "position_value"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
@@ -344,7 +344,7 @@ class RateSensor(InstrumentEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 4
     _attr_translation_key = "rate"
-    _attr_unrecorded_attributes = frozenset({"change_pct"})
+    _attr_unrecorded_attributes = frozenset({"change_pct", "position_value"})
 
     def __init__(self, coordinator: ProviderSnapshotCoordinator, entry_id: str, tracker: InstrumentTracker) -> None:
         super().__init__(coordinator, entry_id, tracker.ref)
