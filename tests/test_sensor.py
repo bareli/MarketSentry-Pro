@@ -1,14 +1,17 @@
-"""Tests for sensor.py's ENH-011 position-value logic: pure Python, no hass
-fixture needed (see tests/test_init_detectors.py's module docstring - only
-the full `hass` test *fixture* used by tests/config_flow/ needs the
-POSIX-only `homeassistant.runner`; importing `homeassistant` modules at
-module load time works fine on Windows once its dependencies are
-installed)."""
+"""Tests for sensor.py's ENH-011 position-value logic, plus ENH-010's
+recorder/statistics-eligibility checks below: pure Python, no hass fixture
+needed (see tests/test_init_detectors.py's module docstring - only the
+full `hass` test *fixture* used by tests/config_flow/ needs the POSIX-only
+`homeassistant.runner`; importing `homeassistant` modules and instantiating
+its entity base classes at module load time works fine on Windows once its
+dependencies are installed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+
+from homeassistant.components.sensor import SensorStateClass
 
 from custom_components.marketsentry import InstrumentDetectors, InstrumentTracker
 from custom_components.marketsentry.const import CONF_PROVIDER, OPT_QUANTITY
@@ -20,6 +23,9 @@ from custom_components.marketsentry.detector import (
 from custom_components.marketsentry.providers.base import InstrumentRef, Quote
 from custom_components.marketsentry.sensor import (
     PositionValueTotalSensor,
+    PriceSensor,
+    ProbabilitySensor,
+    RateSensor,
     _position_value,
     _unrealized_pnl,
 )
@@ -137,3 +143,69 @@ def test_unrealized_pnl_pct_is_none_when_cost_basis_is_zero() -> None:
     pnl, pnl_pct = _unrealized_pnl(10.0, 0.0, 150.0, is_outcome=False)
     assert pnl == 1500.0
     assert pnl_pct is None
+
+
+# --- ENH-010: recorder/long-term-statistics eligibility for the three
+# primary sensors (Probability/Price/Rate). HA's recorder only computes
+# long-term (mean/min/max) statistics for a sensor whose `state_class` is
+# `SensorStateClass.MEASUREMENT` - the correct choice for an instantaneous,
+# non-cumulative reading. `TOTAL`/`TOTAL_INCREASING` would silently produce
+# a nonsensical "summed" statistic instead (see
+# `homeassistant.components.sensor.const.SensorStateClass`'s own
+# docstrings). This never needs the hass fixture: `state_class` and
+# `native_unit_of_measurement` are plain entity attributes/properties, and
+# `CoordinatorEntity.__init__` does not touch `coordinator` unless
+# `.available`/`.async_update` are called, which these tests do not do.
+
+
+def _primary_sensors(price: float | None) -> tuple[ProbabilitySensor, PriceSensor, RateSensor]:
+    probability = ProbabilitySensor(
+        coordinator=None,  # type: ignore[arg-type]
+        entry_id="entry1",
+        tracker=_tracker("outcome", quantity=None, price=price),
+    )
+    stock_price = PriceSensor(
+        coordinator=None,  # type: ignore[arg-type]
+        entry_id="entry1",
+        tracker=_tracker("stock", quantity=None, price=price, unit="USD"),
+    )
+    rate = RateSensor(
+        coordinator=None,  # type: ignore[arg-type]
+        entry_id="entry1",
+        tracker=_tracker("fx", quantity=None, price=price, unit="ILS"),
+    )
+    return probability, stock_price, rate
+
+
+def test_primary_sensors_declare_measurement_state_class_for_recorder_statistics() -> None:
+    for sensor in _primary_sensors(price=0.5):
+        assert sensor._attr_state_class == SensorStateClass.MEASUREMENT
+        assert sensor._attr_state_class not in (SensorStateClass.TOTAL, SensorStateClass.TOTAL_INCREASING)
+
+
+def test_primary_sensors_have_a_stable_non_empty_native_unit() -> None:
+    """A `None`/empty or changing unit breaks the recorder's long-term
+    statistics for the entity (HA resets history on a unit change)."""
+    probability, price, rate = _primary_sensors(price=0.5)
+    assert probability.native_unit_of_measurement == "%"
+    assert price.native_unit_of_measurement == "USD"
+    assert rate.native_unit_of_measurement == "ILS"
+
+
+def test_primary_sensors_native_value_is_numeric_when_live_price_present() -> None:
+    """`state_class=MEASUREMENT` requires `native_value` to be a real
+    numeric instantaneous reading, not `None`/a string, whenever a live
+    quote exists."""
+    probability, price, rate = _primary_sensors(price=0.5)
+    assert isinstance(probability.native_value, float)
+    assert isinstance(price.native_value, float)
+    assert isinstance(rate.native_value, float)
+
+
+def test_primary_sensors_native_value_is_none_without_a_live_quote() -> None:
+    """No stats are reported before the first live price - `native_value`
+    reads unknown, not a fabricated 0."""
+    probability, price, rate = _primary_sensors(price=None)
+    assert probability.native_value is None
+    assert price.native_value is None
+    assert rate.native_value is None
