@@ -11,6 +11,9 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.persistent_notification import (
+    async_create as async_create_notification,
+)
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -18,7 +21,7 @@ from homeassistant.config_entries import (
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -109,6 +112,36 @@ def _options_schema(kind: str, defaults: dict[str, Any]) -> vol.Schema:
         ] = vol.Coerce(float)
         fields[vol.Optional(OPT_EXTENDED_HOURS, default=defaults.get(OPT_EXTENDED_HOURS, False))] = bool
     return vol.Schema(fields)
+
+
+DASHBOARD_STRATEGY_NOTIFICATION_ID = "marketsentry_dashboard_strategy"
+
+
+def _any_instrument_exists(hass: HomeAssistant, exclude_entry_id: str) -> bool:
+    """True if any MarketSentry Pro entry other than `exclude_entry_id` already has an instrument."""
+    return any(
+        entry.subentries
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.entry_id != exclude_entry_id
+    )
+
+
+def _notify_dashboard_strategy(hass: HomeAssistant) -> None:
+    """One-time nudge toward the auto-dashboard strategy, shown after the very first instrument."""
+    async_create_notification(
+        hass,
+        title="MarketSentry Pro: build a dashboard automatically",
+        message=(
+            "Your first tracked instrument is set up. Add a view to any dashboard, "
+            "switch it to YAML mode (pencil icon > Add view > 3-dot menu), and paste:\n\n"
+            "```yaml\n"
+            "strategy:\n"
+            "  type: custom:marketsentry\n"
+            "```\n\n"
+            "It fills itself with every instrument you track, no manual card placement."
+        ),
+        notification_id=DASHBOARD_STRATEGY_NOTIFICATION_ID,
+    )
 
 
 def _parse_options_form(kind: str, user_input: dict[str, Any]) -> dict[str, Any]:
@@ -313,6 +346,9 @@ class InstrumentSubentryFlow(ConfigSubentryFlow):
             return self.async_abort(reason="already_configured")
 
         if user_input is not None:
+            is_first_instrument_ever = not existing_ids and not _any_instrument_exists(
+                self.hass, entry.entry_id
+            )
             data = {
                 CONF_INSTRUMENT_ID: ref.id,
                 CONF_SYMBOL: ref.symbol,
@@ -323,6 +359,8 @@ class InstrumentSubentryFlow(ConfigSubentryFlow):
                 CONF_EXTRA: ref.extra,
                 CONF_OPTIONS: _parse_options_form(ref.kind, user_input),
             }
+            if is_first_instrument_ever:
+                _notify_dashboard_strategy(self.hass)
             return self.async_create_entry(title=ref.name, data=data, unique_id=ref.id)
 
         schema = _options_schema(ref.kind, default_options_for_kind(ref.kind))

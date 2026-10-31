@@ -3,11 +3,11 @@
   "name": "MarketSentry Pro",
   "codeowners": ["@bareli"],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": ["http", "persistent_notification"],
   "documentation": "https://github.com/bareli/MarketSentry-Pro",
   "integration_type": "service",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/bareli/MarketSentry-Pro/issues",
   "requirements": [],
-  "version": "0.5.1"
+  "version": "0.6.0"
 }

@@ -97,3 +97,10 @@ Linux environment or is inferred from CI's `Lint and test` workflow being green;
   the symbol - regression test for BUG-001 (crypto's `InstrumentRef.name` baked the symbol in
   twice: "Tracking Bitcoin (BTC) (BTC)."). Live-reproduced with two different coins (bitcoin,
   ethereum) 2026-10-31; not yet covered by an automated test.
+- **CFG-16** Creating the very first instrument subentry across the whole integration (no other
+  config entry has one yet) raises a one-time `persistent_notification` pointing at the
+  `custom:marketsentry` dashboard strategy; a second instrument (same or another entry) does not
+  re-notify. ENH-003 (issue #10), implemented per decision D-009/D-011.
+  - **AUTOMATED** `tests/config_flow/test_config_flow.py::test_first_instrument_ever_notifies_dashboard_strategy`
+    and `::test_second_instrument_does_not_renotify` (CI-only, Linux `hass` fixture - see
+    `qa/CLAUDE.md` §1).

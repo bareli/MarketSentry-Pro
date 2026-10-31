@@ -156,6 +156,69 @@ async def test_instrument_subentry_single_match_flow(hass: HomeAssistant) -> Non
     assert result["data"]["symbol"] == "AAPL"
 
 
+async def test_first_instrument_ever_notifies_dashboard_strategy(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref()],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "AAPL"}
+        )
+
+    with patch(
+        "custom_components.marketsentry.config_flow.async_create_notification"
+    ) as mock_notify:
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    mock_notify.assert_called_once()
+    assert mock_notify.call_args.kwargs["notification_id"] == "marketsentry_dashboard_strategy"
+
+
+async def test_second_instrument_does_not_renotify(hass: HomeAssistant) -> None:
+    entry = await _create_finnhub_entry(hass)
+    ref1 = _ref()
+    hass.config_entries.async_add_subentry(
+        entry,
+        ConfigSubentry(
+            data={"instrument_id": ref1.id, "symbol": ref1.symbol},
+            subentry_type=SUBENTRY_TYPE_INSTRUMENT,
+            title=ref1.name,
+            unique_id=ref1.id,
+        ),
+    )
+
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_TYPE_INSTRUMENT), context={"source": "user"}
+    )
+    with patch(
+        "custom_components.marketsentry.providers.finnhub.FinnhubProvider.resolve",
+        return_value=[_ref("MSFT", "MSFT")],
+    ):
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {"url_or_query": "MSFT"}
+        )
+
+    with patch(
+        "custom_components.marketsentry.config_flow.async_create_notification"
+    ) as mock_notify:
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {"thresholds": "", "hysteresis": 0.0, "move_delta": 2.0, "move_window_min": 60, "cooldown_min": 15},
+        )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    mock_notify.assert_not_called()
+
+
 async def test_instrument_subentry_multiple_matches_shows_select(hass: HomeAssistant) -> None:
     entry = await _create_finnhub_entry(hass)
     refs = [_ref("AAPL", "AAPL"), _ref("AAPL.MX", "AAPL.MX")]
