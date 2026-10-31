@@ -46,9 +46,9 @@ def _tool_slots(**kwargs: Any) -> dict[str, Any]:
     return {key: {"value": val} for key, val in kwargs.items()}
 
 
-def test_async_setup_intents_registers_the_handler() -> None:
+async def test_async_setup_intents_registers_the_handler() -> None:
     hass = _FakeHass()
-    async_setup_intents(hass)
+    await async_setup_intents(hass)
 
     handlers = list(ha_intent.async_get(hass))
     assert len(handlers) == 1
@@ -56,13 +56,25 @@ def test_async_setup_intents_registers_the_handler() -> None:
     assert isinstance(handlers[0], SearchInstrumentsIntentHandler)
 
 
-def test_async_setup_intents_is_idempotent() -> None:
+async def test_async_setup_intents_is_idempotent() -> None:
     hass = _FakeHass()
-    async_setup_intents(hass)
-    async_setup_intents(hass)
+    await async_setup_intents(hass)
+    await async_setup_intents(hass)
 
     handlers = list(ha_intent.async_get(hass))
     assert len(handlers) == 1
+
+
+async def test_async_setup_intents_is_a_coroutine_function() -> None:
+    """Regression (live-verified 2026-11-01): HA's own `intent` component
+    auto-discovers `intent.py`'s `async_setup_intents` via its documented
+    `IntentPlatformProtocol` and does `await platform.async_setup_intents(
+    hass)` - a plain `def` here evaluates synchronously and returns `None`,
+    which raises `TypeError: 'NoneType' object can't be awaited` the moment
+    HA's real bootstrap (not this file's own direct calls) reaches it."""
+    import inspect
+
+    assert inspect.iscoroutinefunction(async_setup_intents)
 
 
 async def test_async_handle_speaks_single_match(monkeypatch: pytest.MonkeyPatch) -> None:

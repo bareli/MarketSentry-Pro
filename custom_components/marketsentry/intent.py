@@ -90,8 +90,19 @@ class SearchInstrumentsIntentHandler(intent.IntentHandler):
         return response
 
 
-def async_setup_intents(hass: HomeAssistant) -> None:
-    """Register the search_instruments Assist/LLM intent. Safe to call more than once."""
+async def async_setup_intents(hass: HomeAssistant) -> None:
+    """Register the search_instruments Assist/LLM intent. Safe to call more than once.
+
+    This is HA's own `intent` component's documented integration-platform
+    protocol (`homeassistant.components.intent.IntentPlatformProtocol`,
+    `async def async_setup_intents(self, hass) -> None`): a module named
+    `intent.py` exposing a top-level function of this exact name/signature
+    is auto-discovered and awaited by `async_process_integration_platforms`
+    during HA's own bootstrap - it must be a real coroutine function (even
+    though this body has nothing to await) or HA's `await
+    platform.async_setup_intents(hass)` raises `TypeError: 'NoneType'
+    object can't be awaited`. HA calls this automatically; nothing in this
+    integration needs to call it itself (see `__init__.py`)."""
     if any(handler.intent_type == INTENT_SEARCH_INSTRUMENTS for handler in intent.async_get(hass)):
         return
     intent.async_register(hass, SearchInstrumentsIntentHandler())
