@@ -188,7 +188,7 @@ Each config entry exposes a diagnostics download (Settings > Devices & services 
 ## Limitations
 
 - Read-only by design. No trading, no wallet/brokerage integration, no order placement.
-- Streaming connection health is tracked per provider account, not finely per-reconnect (each provider's own `stream()` loop handles its own reconnect/backoff internally without reporting intermediate transitions); the "stream connected" binary sensor is an approximation of "the stream task is running," not a live up/down signal.
+- Streaming connection health is tracked per provider account. Each of Finnhub/Alpaca's `stream()` loops reports its real connection phase (connecting/connected/reconnecting/backing off) as it happens; the "stream connected" binary sensor reflects that live state (on only once actually connected) and exposes `reconnecting`/`reconnect_count` attributes for the finer-grained detail (ENH-007).
 - Some external API facts (noted per-provider below) weren't independently verified against live docs in this project's sessions; verify before relying on them in production.
 
 ## Development

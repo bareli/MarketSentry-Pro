@@ -43,6 +43,8 @@ async def async_get_config_entry_diagnostics(
         "provider": entry.data.get(CONF_PROVIDER),
         "snapshot_coordinator_last_update_success": runtime.snapshot_coordinator.last_update_success,
         "stream_connected": runtime.stream_connected,
+        "stream_phase": runtime.stream_phase,
+        "stream_reconnect_count": runtime.stream_reconnect_count,
         "trackers": trackers_diag,
         "polymarket_metadata": polymarket_metadata_diag,
     }

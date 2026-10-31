@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
@@ -12,6 +14,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SIGNAL_STREAM_STATE, InstrumentTracker, MarketSentryConfigEntry
 from .coordinator import PolymarketMetadataCoordinator
 from .entity import instrument_device_info, provider_connection_device_info
+from .providers.base import StreamStatus
+
+_RECONNECTING_PHASES = {"reconnecting", "backing_off"}
 
 
 async def async_setup_entry(
@@ -78,9 +83,13 @@ class AcceptingOrdersBinarySensor(_MetadataBinarySensor):
 class StreamConnectedBinarySensor(BinarySensorEntity):
     """Entry-level: is this provider account's streaming connection up?
 
-    Approximate: true while the stream task is running. Reconnects happen
-    inside each provider's own `stream()` loop, which has no hook to report
-    finer-grained connect/disconnect transitions back out.
+    `is_on` reflects the real connection phase each provider's `stream()`
+    loop reports via its `on_status` callback (ENH-007), not just "the
+    asyncio task hasn't died" - it reads False while connecting, reconnecting,
+    or backing off, and True only once a connection is actually established.
+    The `reconnecting`/`reconnect_count` attributes surface the finer-grained
+    phase without adding a third on/off state, keeping the existing binary
+    on/off contract backward compatible for anyone templating on it.
     """
 
     _attr_has_entity_name = True
@@ -96,6 +105,14 @@ class StreamConnectedBinarySensor(BinarySensorEntity):
     def is_on(self) -> bool:
         return self._entry.runtime_data.stream_connected
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        runtime = self._entry.runtime_data
+        return {
+            "reconnecting": runtime.stream_phase in _RECONNECTING_PHASES,
+            "reconnect_count": runtime.stream_reconnect_count,
+        }
+
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
             async_dispatcher_connect(
@@ -104,5 +121,5 @@ class StreamConnectedBinarySensor(BinarySensorEntity):
         )
 
     @callback
-    def _handle_stream_state(self, _connected: bool) -> None:
+    def _handle_stream_state(self, _status: StreamStatus) -> None:
         self.async_write_ha_state()

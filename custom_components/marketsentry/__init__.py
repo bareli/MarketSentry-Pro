@@ -70,7 +70,7 @@ from .detector import (
 )
 from .market_calendar import market_state as calc_market_state
 from .providers import PROVIDERS, build_provider
-from .providers.base import InstrumentRef, Provider, ProviderEvent, Quote, Trade
+from .providers.base import InstrumentRef, Provider, ProviderEvent, Quote, StreamStatus, Trade
 from .services import async_setup_services
 from .websocket_api import async_get_history_buffer, async_setup_websocket_api
 
@@ -123,6 +123,8 @@ class MarketSentryRuntimeData:
     polymarket_metadata: dict[str, PolymarketMetadataCoordinator]
     stream_task: asyncio.Task[None] | None = None
     stream_connected: bool = False
+    stream_phase: str = "connecting"
+    stream_reconnect_count: int = 0
 
 
 type MarketSentryConfigEntry = ConfigEntry[MarketSentryRuntimeData]
@@ -321,18 +323,23 @@ async def _async_start_streaming(hass: HomeAssistant, entry: MarketSentryConfigE
         if tracker is not None:
             await _async_process_provider_event(hass, entry, tracker, provider_event)
 
+    @callback
+    def on_status(status: StreamStatus) -> None:
+        runtime.stream_phase = status.phase
+        runtime.stream_reconnect_count = status.reconnect_count
+        runtime.stream_connected = status.phase == "connected"
+        async_dispatcher_send(hass, f"{SIGNAL_STREAM_STATE}_{entry.entry_id}", status)
+
     async def run() -> None:
-        runtime.stream_connected = True
-        async_dispatcher_send(hass, f"{SIGNAL_STREAM_STATE}_{entry.entry_id}", True)
+        on_status(StreamStatus(phase="connecting", reconnect_count=0))
         try:
-            await runtime.provider.stream(refs, on_quote, on_trade, on_event)
+            await runtime.provider.stream(refs, on_quote, on_trade, on_event, on_status)
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Stream for entry %s ended: %s", entry.entry_id, type(err).__name__)
         finally:
-            runtime.stream_connected = False
-            async_dispatcher_send(hass, f"{SIGNAL_STREAM_STATE}_{entry.entry_id}", False)
+            on_status(StreamStatus(phase="stopped", reconnect_count=runtime.stream_reconnect_count))
 
     runtime.stream_task = hass.async_create_task(run())
 

@@ -52,10 +52,12 @@ from .base import (
     InvalidAuth,
     OnProviderEvent,
     OnQuote,
+    OnStreamStatus,
     OnTrade,
     PricePoint,
     Provider,
     Quote,
+    StreamStatus,
     Trade,
 )
 
@@ -216,6 +218,7 @@ class AlpacaProvider(Provider):
         on_quote: OnQuote,
         on_trade: OnTrade,
         on_event: OnProviderEvent,
+        on_status: OnStreamStatus | None = None,
     ) -> None:
         if len(refs) > FREE_TIER_WS_SYMBOL_LIMIT:
             _LOGGER.warning(
@@ -226,9 +229,17 @@ class AlpacaProvider(Provider):
 
         symbols = [ref.id for ref in refs]
         attempt = 0
+        reconnect_count = 0
         while True:
+            if on_status is not None:
+                on_status(
+                    StreamStatus(
+                        phase="connecting" if reconnect_count == 0 else "reconnecting",
+                        reconnect_count=reconnect_count,
+                    )
+                )
             try:
-                await self._connect_and_listen(symbols, on_quote, on_trade)
+                await self._connect_and_listen(symbols, on_quote, on_trade, on_status, reconnect_count)
                 attempt = 0
             except asyncio.CancelledError:
                 raise
@@ -236,10 +247,20 @@ class AlpacaProvider(Provider):
                 _LOGGER.debug("Alpaca WS error: %s", err)
 
             attempt += 1
+            reconnect_count += 1
             delay = min(_RECONNECT_MIN_SEC * (2 ** (attempt - 1)), _RECONNECT_MAX_SEC)
+            if on_status is not None:
+                on_status(StreamStatus(phase="backing_off", reconnect_count=reconnect_count))
             await asyncio.sleep(delay + random.uniform(0, delay * 0.25))
 
-    async def _connect_and_listen(self, symbols: list[str], on_quote: OnQuote, on_trade: OnTrade) -> None:
+    async def _connect_and_listen(
+        self,
+        symbols: list[str],
+        on_quote: OnQuote,
+        on_trade: OnTrade,
+        on_status: OnStreamStatus | None = None,
+        reconnect_count: int = 0,
+    ) -> None:
         url = ALPACA_STREAM_URL_TEMPLATE.format(feed=self._feed)
         async with self._session.ws_connect(url) as ws:
             await ws.send_str(
@@ -261,6 +282,9 @@ class AlpacaProvider(Provider):
 
             if not authenticated:
                 raise InvalidAuth("Alpaca WS authentication failed")
+
+            if on_status is not None:
+                on_status(StreamStatus(phase="connected", reconnect_count=reconnect_count))
 
             await ws.send_str(
                 json.dumps({"action": "subscribe", "trades": symbols, "quotes": symbols})
