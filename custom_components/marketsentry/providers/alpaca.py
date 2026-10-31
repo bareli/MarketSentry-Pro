@@ -157,7 +157,11 @@ class AlpacaProvider(Provider):
     async def fetch_snapshot(self, refs: list[InstrumentRef]) -> dict[str, Quote]:
         quotes: dict[str, Quote] = {}
         for ref in refs:
-            data = await self._get(f"/stocks/{ref.id}/quotes/latest")
+            try:
+                data = await self._get(f"/stocks/{ref.id}/quotes/latest")
+            except CannotConnect as err:
+                _LOGGER.debug("Alpaca snapshot failed for %s: %s", ref.id, err)
+                continue
             quote_data = data.get("quote") if isinstance(data, dict) else None
             if not quote_data:
                 continue

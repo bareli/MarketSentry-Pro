@@ -165,7 +165,11 @@ class FinnhubProvider(Provider):
     async def fetch_snapshot(self, refs: list[InstrumentRef]) -> dict[str, Quote]:
         quotes: dict[str, Quote] = {}
         for ref in refs:
-            data = await self._get("/quote", {"symbol": ref.id})
+            try:
+                data = await self._get("/quote", {"symbol": ref.id})
+            except CannotConnect as err:
+                _LOGGER.debug("Finnhub snapshot failed for %s: %s", ref.id, err)
+                continue
             if not isinstance(data, dict):
                 continue
             price = data.get("c")
