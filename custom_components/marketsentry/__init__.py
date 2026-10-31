@@ -67,6 +67,7 @@ from .market_calendar import market_state as calc_market_state
 from .providers import PROVIDERS, build_provider
 from .providers.base import InstrumentRef, Provider, ProviderEvent, Quote, Trade
 from .services import async_setup_services
+from .websocket_api import async_get_history_buffer, async_setup_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -157,6 +158,12 @@ def _build_detectors(kind: str, opts: dict[str, Any]) -> InstrumentDetectors:
     if kind == "fx":
         detectors.official_rate_published = OfficialRatePublishedDetector()
     return detectors
+
+
+async def async_setup(hass: HomeAssistant, _config: Any) -> bool:
+    """Domain-wide setup: register the `marketsentry/history` WS command once."""
+    async_setup_websocket_api(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MarketSentryConfigEntry) -> bool:
@@ -296,6 +303,7 @@ async def _async_process_quote(
 
     if quote.price is not None:
         value = quote.price * 100 if tracker.ref.kind == "outcome" else quote.price
+        async_get_history_buffer(hass).append(tracker.ref.id, quote.ts or now, value)
         events += tracker.detectors.threshold.update(tracker.ref.symbol, tracker.ref.id, value)
         events += tracker.detectors.move.update(tracker.ref.symbol, tracker.ref.id, value, now)
 

@@ -27,6 +27,12 @@ _MODEL_BY_KIND = {
 }
 
 
+def card_attributes(ref: InstrumentRef) -> dict[str, str | None]:
+    """kind/provider/url on each kind's primary sensor, for marketsentry-card
+    to group, filter, and link out without a custom WS round trip."""
+    return {"kind": ref.kind, "provider": ref.provider, "url": ref.url}
+
+
 def instrument_device_info(entry_id: str, ref: InstrumentRef) -> DeviceInfo:
     """Build the HA device representing one tracked instrument (subentry)."""
     return DeviceInfo(

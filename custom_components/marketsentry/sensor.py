@@ -25,7 +25,7 @@ from .const import (
     STATUS_RESOLVED,
 )
 from .coordinator import PolymarketMetadataCoordinator, ProviderSnapshotCoordinator
-from .entity import InstrumentEntity, instrument_device_info
+from .entity import InstrumentEntity, card_attributes, instrument_device_info
 from .market_calendar import market_state as calc_market_state
 from .providers.base import Quote, Trade
 
@@ -96,6 +96,7 @@ class ProbabilitySensor(InstrumentEntity, SensorEntity):
         if quote.bid is not None and quote.ask is not None:
             spread = round((quote.ask - quote.bid) * 100, 2)
         return {
+            **card_attributes(self._tracker.ref),
             "best_bid": quote.bid,
             "best_ask": quote.ask,
             "spread": spread,
@@ -207,6 +208,10 @@ class PriceSensor(InstrumentEntity, SensorEntity):
     def native_value(self) -> float | None:
         return self._tracker.last_quote.price
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return card_attributes(self._tracker.ref)
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
@@ -281,6 +286,7 @@ class RateSensor(InstrumentEntity, SensorEntity):
         source, _base, _quote = self._tracker.ref.id.split(":")
         quote = self._tracker.last_quote
         return {
+            **card_attributes(self._tracker.ref),
             "source": "official (Bank of Israel)" if source == "boi" else "market (Frankfurter)",
             "published_date": quote.ts.date().isoformat() if quote.ts else None,
         }
