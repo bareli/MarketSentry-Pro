@@ -10,3 +10,4 @@ venv/
 htmlcov/
 .vscode/
 .idea/
+.claude/
