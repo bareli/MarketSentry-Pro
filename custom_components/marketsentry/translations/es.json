@@ -44,7 +44,7 @@
       "step": {
         "user": {
           "title": "Seguir un instrumento",
-          "description": "Pega una URL/slug (Polymarket), un ticker (acciones) o un par como EUR/ILS (FX; añade /boi para el tipo oficial del Banco de Israel en lugar del tipo de mercado). El texto libre también funciona como búsqueda.",
+          "description": "Pega una URL/slug (Polymarket), un ticker (acciones, p. ej. AAPL, MSFT, TSLA), un id de moneda (cripto, p. ej. bitcoin, ethereum) o un par como EUR/ILS (FX; añade /boi para el tipo oficial del Banco de Israel en lugar del tipo de mercado). El texto libre también funciona como búsqueda.",
           "data": {
             "url_or_query": "URL, ticker o par"
           }
