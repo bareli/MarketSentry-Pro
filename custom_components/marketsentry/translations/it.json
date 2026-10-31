@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Soglia gap di apertura (%)",
             "extended_hours": "Segui orario esteso",
             "cooldown_min": "Tempo di attesa per tipo di evento (minuti)",
-            "quantity": "Quantità posseduta"
+            "quantity": "Quantità posseduta",
+            "cost_basis": "Prezzo di costo per unità"
           },
           "data_description": {
             "hysteresis": "Quanto il valore deve tornare indietro prima che la stessa soglia possa attivarsi di nuovo, nella stessa unità del valore di questo strumento.",
             "move_delta": "Variazione minima all'interno della finestra di movimento che conta come movimento rapido, nella stessa unità del valore di questo strumento.",
-            "quantity": "Quante unità di questo strumento possiedi, usato per calcolare il valore della posizione e il totale per tipo. Lascia vuoto per seguire solo il prezzo."
+            "quantity": "Quante unità di questo strumento possiedi, usato per calcolare il valore della posizione e il totale per tipo. Lascia vuoto per seguire solo il prezzo.",
+            "cost_basis": "Il prezzo unitario che hai pagato, usato per calcolare il profitto o la perdita non realizzata di questo strumento. Lascia vuoto per saltare questo calcolo."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Soglia gap di apertura (%)",
             "extended_hours": "Segui orario esteso",
             "cooldown_min": "Tempo di attesa per tipo di evento (minuti)",
-            "quantity": "Quantità posseduta"
+            "quantity": "Quantità posseduta",
+            "cost_basis": "Prezzo di costo per unità"
           },
           "data_description": {
             "hysteresis": "Quanto il valore deve tornare indietro prima che la stessa soglia possa attivarsi di nuovo, nella stessa unità del valore di questo strumento.",
             "move_delta": "Variazione minima all'interno della finestra di movimento che conta come movimento rapido, nella stessa unità del valore di questo strumento.",
-            "quantity": "Quante unità di questo strumento possiedi, usato per calcolare il valore della posizione e il totale per tipo. Lascia vuoto per seguire solo il prezzo."
+            "quantity": "Quante unità di questo strumento possiedi, usato per calcolare il valore della posizione e il totale per tipo. Lascia vuoto per seguire solo il prezzo.",
+            "cost_basis": "Il prezzo unitario che hai pagato, usato per calcolare il profitto o la perdita non realizzata di questo strumento. Lascia vuoto per saltare questo calcolo."
           }
         }
       },

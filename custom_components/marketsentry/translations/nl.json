@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
             "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)",
-            "quantity": "Aangehouden hoeveelheid"
+            "quantity": "Aangehouden hoeveelheid",
+            "cost_basis": "Kostprijs per eenheid"
           },
           "data_description": {
             "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
             "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf.",
-            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen."
+            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen.",
+            "cost_basis": "De prijs per eenheid die je hebt betaald, gebruikt om de ongerealiseerde winst of verlies van dit instrument te berekenen. Laat leeg om deze berekening over te slaan."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Drempel openingsgat (%)",
             "extended_hours": "Verlengde handelsuren volgen",
             "cooldown_min": "Afkoelperiode per gebeurtenistype (minuten)",
-            "quantity": "Aangehouden hoeveelheid"
+            "quantity": "Aangehouden hoeveelheid",
+            "cost_basis": "Kostprijs per eenheid"
           },
           "data_description": {
             "hysteresis": "Hoe ver de waarde moet teruglopen voordat dezelfde drempel opnieuw kan afgaan, in dezelfde eenheid als de waarde van dit instrument zelf.",
             "move_delta": "Minimale verandering binnen het bewegingsvenster die als snelle beweging geldt, in dezelfde eenheid als de waarde van dit instrument zelf.",
-            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen."
+            "quantity": "Hoeveel eenheden van dit instrument je aanhoudt, gebruikt om de positiewaarde en het totaal per soort te berekenen. Laat leeg om alleen de prijs te volgen.",
+            "cost_basis": "De prijs per eenheid die je hebt betaald, gebruikt om de ongerealiseerde winst of verlies van dit instrument te berekenen. Laat leeg om deze berekening over te slaan."
           }
         }
       },

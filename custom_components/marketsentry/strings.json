@@ -70,7 +70,8 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)",
-            "quantity": "Quantity held"
+            "quantity": "Quantity held",
+            "cost_basis": "Cost basis per unit"
           }
         },
         "reconfigure": {
@@ -87,7 +88,8 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)",
-            "quantity": "Quantity held"
+            "quantity": "Quantity held",
+            "cost_basis": "Cost basis per unit"
           }
         }
       },

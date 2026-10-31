@@ -53,6 +53,10 @@ OPT_COOLDOWN_MIN: Final = "cooldown_min"
 # Optional quantity held, for position_value/aggregate-total sensors
 # (ENH-011). None/unset by default so pure-watchlist use is unaffected.
 OPT_QUANTITY: Final = "quantity"
+# Optional cost basis per unit, for unrealized_pnl/unrealized_pnl_pct
+# (ENH-012). Same per-kind/same-currency basis as OPT_QUANTITY (D-017/D-028);
+# None/unset by default so pure-watchlist use is unaffected.
+OPT_COST_BASIS: Final = "cost_basis"
 
 DEFAULT_COOLDOWN_MIN: Final = 15
 DEFAULT_LARGE_TRADE_USD: Final = 10_000.0
@@ -75,6 +79,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_CLOSING_SOON_HOURS: DEFAULT_CLOSING_SOON_HOURS,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
             OPT_QUANTITY: None,
+            OPT_COST_BASIS: None,
         }
     if kind == "stock":
         return {
@@ -88,6 +93,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_EXTENDED_HOURS: False,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
             OPT_QUANTITY: None,
+            OPT_COST_BASIS: None,
         }
     if kind == "crypto":
         return {
@@ -98,6 +104,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
             OPT_DAILY_CHANGE_PCT: DEFAULT_DAILY_CHANGE_PCT,
             OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
             OPT_QUANTITY: None,
+            OPT_COST_BASIS: None,
         }
     # fx
     return {
@@ -108,6 +115,7 @@ def default_options_for_kind(kind: str) -> dict[str, Any]:
         OPT_DAILY_CHANGE_PCT: DEFAULT_DAILY_CHANGE_PCT,
         OPT_COOLDOWN_MIN: DEFAULT_COOLDOWN_MIN,
         OPT_QUANTITY: None,
+        OPT_COST_BASIS: None,
     }
 
 

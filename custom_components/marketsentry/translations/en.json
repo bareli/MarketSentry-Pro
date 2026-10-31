@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)",
-            "quantity": "Quantity held"
+            "quantity": "Quantity held",
+            "cost_basis": "Cost basis per unit"
           },
           "data_description": {
             "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
             "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value.",
-            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only."
+            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only.",
+            "cost_basis": "The price per unit you paid, used to compute this instrument's unrealized profit or loss. Leave blank to skip P&L."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Market-open gap threshold (%)",
             "extended_hours": "Track extended hours",
             "cooldown_min": "Cooldown per event type (minutes)",
-            "quantity": "Quantity held"
+            "quantity": "Quantity held",
+            "cost_basis": "Cost basis per unit"
           },
           "data_description": {
             "hysteresis": "How far the value must move back before the same threshold can fire again, in the same units as this instrument's own value.",
             "move_delta": "Minimum change within the move window that counts as a fast move, in the same units as this instrument's own value.",
-            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only."
+            "quantity": "How many units you hold, used to compute this instrument's position value and its kind's total. Leave blank to track price only.",
+            "cost_basis": "The price per unit you paid, used to compute this instrument's unrealized profit or loss. Leave blank to skip P&L."
           }
         }
       },

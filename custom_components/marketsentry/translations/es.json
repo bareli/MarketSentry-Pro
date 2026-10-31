@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
             "cooldown_min": "Tiempo de espera por tipo de evento (minutos)",
-            "quantity": "Cantidad en posesión"
+            "quantity": "Cantidad en posesión",
+            "cost_basis": "Costo base por unidad"
           },
           "data_description": {
             "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
             "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento.",
-            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio."
+            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio.",
+            "cost_basis": "El precio por unidad que pagaste, usado para calcular la ganancia o pérdida no realizada de este instrumento. Déjalo vacío para omitir el cálculo de ganancias y pérdidas."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Umbral de hueco de apertura (%)",
             "extended_hours": "Seguir horario extendido",
             "cooldown_min": "Tiempo de espera por tipo de evento (minutos)",
-            "quantity": "Cantidad en posesión"
+            "quantity": "Cantidad en posesión",
+            "cost_basis": "Costo base por unidad"
           },
           "data_description": {
             "hysteresis": "Cuánto debe retroceder el valor antes de que el mismo umbral pueda activarse de nuevo, en la misma unidad que el valor de este instrumento.",
             "move_delta": "Cambio mínimo dentro de la ventana de movimiento que cuenta como un movimiento rápido, en la misma unidad que el valor de este instrumento.",
-            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio."
+            "quantity": "Cuántas unidades de este instrumento posees, usado para calcular el valor de la posición y el total por tipo. Déjalo vacío para seguir solo el precio.",
+            "cost_basis": "El precio por unidad que pagaste, usado para calcular la ganancia o pérdida no realizada de este instrumento. Déjalo vacío para omitir el cálculo de ganancias y pérdidas."
           }
         }
       },

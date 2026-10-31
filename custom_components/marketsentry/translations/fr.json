@@ -71,12 +71,14 @@
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
             "cooldown_min": "Délai de repos par type d'événement (minutes)",
-            "quantity": "Quantité détenue"
+            "quantity": "Quantité détenue",
+            "cost_basis": "Coût de base par unité"
           },
           "data_description": {
             "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
             "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument.",
-            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix."
+            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix.",
+            "cost_basis": "Le prix unitaire que vous avez payé, utilisé pour calculer le profit ou la perte latente de cet instrument. Laissez vide pour ignorer ce calcul."
           }
         },
         "reconfigure": {
@@ -93,12 +95,14 @@
             "market_open_gap_pct": "Seuil d'écart à l'ouverture (%)",
             "extended_hours": "Suivre les heures étendues",
             "cooldown_min": "Délai de repos par type d'événement (minutes)",
-            "quantity": "Quantité détenue"
+            "quantity": "Quantité détenue",
+            "cost_basis": "Coût de base par unité"
           },
           "data_description": {
             "hysteresis": "Distance dont la valeur doit revenir avant que le même seuil puisse se déclencher à nouveau, dans la même unité que la valeur de cet instrument.",
             "move_delta": "Variation minimale dans la fenêtre de mouvement comptant comme un mouvement rapide, dans la même unité que la valeur de cet instrument.",
-            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix."
+            "quantity": "Combien d'unités de cet instrument vous détenez, utilisé pour calculer la valeur de la position et le total par type. Laissez vide pour ne suivre que le prix.",
+            "cost_basis": "Le prix unitaire que vous avez payé, utilisé pour calculer le profit ou la perte latente de cet instrument. Laissez vide pour ignorer ce calcul."
           }
         }
       },
