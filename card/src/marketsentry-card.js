@@ -87,7 +87,11 @@ export class MarketSentryCard extends HTMLElement {
       <ha-card>
         ${this._config.title ? `<h1 class="card-header">${escapeHtml(this._config.title)}</h1>` : ""}
         <div class="content">
-          ${groups.length === 0 ? `<div class="empty">${escapeHtml(t(lang, "empty_card"))}</div>` : ""}
+          ${
+            groups.length === 0
+              ? `<div class="empty">${escapeHtml(t(lang, allRows.length === 0 ? "empty_card_no_instruments" : "empty_card"))}</div>`
+              : ""
+          }
           ${groups.map((group) => this._renderGroup(group, lang)).join("")}
         </div>
       </ha-card>

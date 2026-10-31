@@ -23,7 +23,10 @@ export const DATE_LOCALES = {
 export const STRINGS = {
   en: {
     empty_card: "No tracked instruments match this card's filters.",
+    empty_card_no_instruments: "No MarketSentry Pro instruments are tracked yet. Add one via Settings > Devices & services > MarketSentry Pro > Add instrument.",
     empty_instrument: "Entity not found or not a MarketSentry Pro instrument: {entity}",
+    empty_instrument_no_entity: "No instrument is configured for this card yet.",
+    empty_instrument_add_instrument: "Add one via Settings > Devices & services > MarketSentry Pro > Add instrument",
     group_predictions: "Prediction markets",
     group_stocks: "Stocks",
     group_crypto: "Cryptocurrencies",
@@ -58,7 +61,10 @@ export const STRINGS = {
   },
   he: {
     empty_card: "אין מכשירים מנוטרים התואמים את המסננים של כרטיס זה.",
+    empty_card_no_instruments: "אין עדיין מכשירי MarketSentry Pro במעקב. הוסף אחד דרך הגדרות > מכשירים ושירותים > MarketSentry Pro > הוספת מכשיר.",
     empty_instrument: "הישות לא נמצאה או שאינה מכשיר MarketSentry Pro: {entity}",
+    empty_instrument_no_entity: "לא הוגדר מכשיר עבור כרטיס זה.",
+    empty_instrument_add_instrument: "הוסף מכשיר דרך הגדרות > מכשירים ושירותים > MarketSentry Pro > הוספת מכשיר",
     group_predictions: "שוקי חיזוי",
     group_stocks: "מניות",
     group_crypto: "מטבעות קריפטו",
@@ -93,7 +99,10 @@ export const STRINGS = {
   },
   de: {
     empty_card: "Keine verfolgten Instrumente entsprechen den Filtern dieser Karte.",
+    empty_card_no_instruments: "Es werden noch keine MarketSentry-Pro-Instrumente verfolgt. Fügen Sie eines über Einstellungen > Geräte & Dienste > MarketSentry Pro > Instrument hinzufügen hinzu.",
     empty_instrument: "Entität nicht gefunden oder kein MarketSentry-Pro-Instrument: {entity}",
+    empty_instrument_no_entity: "Für diese Karte ist noch kein Instrument konfiguriert.",
+    empty_instrument_add_instrument: "Fügen Sie eines über Einstellungen > Geräte & Dienste > MarketSentry Pro > Instrument hinzufügen hinzu",
     group_predictions: "Prognosemärkte",
     group_stocks: "Aktien",
     group_crypto: "Kryptowährungen",
@@ -128,7 +137,10 @@ export const STRINGS = {
   },
   fr: {
     empty_card: "Aucun instrument suivi ne correspond aux filtres de cette carte.",
+    empty_card_no_instruments: "Aucun instrument MarketSentry Pro n'est encore suivi. Ajoutez-en un via Paramètres > Appareils et services > MarketSentry Pro > Ajouter un instrument.",
     empty_instrument: "Entité introuvable ou n'est pas un instrument MarketSentry Pro : {entity}",
+    empty_instrument_no_entity: "Aucun instrument n'est configuré pour cette carte.",
+    empty_instrument_add_instrument: "Ajoutez-en un via Paramètres > Appareils et services > MarketSentry Pro > Ajouter un instrument",
     group_predictions: "Marchés de prédiction",
     group_stocks: "Actions",
     group_crypto: "Cryptomonnaies",
@@ -163,7 +175,10 @@ export const STRINGS = {
   },
   es: {
     empty_card: "Ningún instrumento seguido coincide con los filtros de esta tarjeta.",
+    empty_card_no_instruments: "Todavía no se sigue ningún instrumento de MarketSentry Pro. Añade uno desde Configuración > Dispositivos y servicios > MarketSentry Pro > Añadir instrumento.",
     empty_instrument: "Entidad no encontrada o no es un instrumento de MarketSentry Pro: {entity}",
+    empty_instrument_no_entity: "No hay ningún instrumento configurado para esta tarjeta.",
+    empty_instrument_add_instrument: "Añade uno desde Configuración > Dispositivos y servicios > MarketSentry Pro > Añadir instrumento",
     group_predictions: "Mercados de predicción",
     group_stocks: "Acciones",
     group_crypto: "Criptomonedas",
@@ -198,7 +213,10 @@ export const STRINGS = {
   },
   "pt-BR": {
     empty_card: "Nenhum instrumento acompanhado corresponde aos filtros deste cartão.",
+    empty_card_no_instruments: "Nenhum instrumento do MarketSentry Pro está sendo acompanhado ainda. Adicione um em Configurações > Dispositivos e serviços > MarketSentry Pro > Adicionar instrumento.",
     empty_instrument: "Entidade não encontrada ou não é um instrumento MarketSentry Pro: {entity}",
+    empty_instrument_no_entity: "Nenhum instrumento está configurado para este cartão ainda.",
+    empty_instrument_add_instrument: "Adicione um em Configurações > Dispositivos e serviços > MarketSentry Pro > Adicionar instrumento",
     group_predictions: "Mercados de previsão",
     group_stocks: "Ações",
     group_crypto: "Criptomoedas",
@@ -233,7 +251,10 @@ export const STRINGS = {
   },
   it: {
     empty_card: "Nessuno strumento seguito corrisponde ai filtri di questa scheda.",
+    empty_card_no_instruments: "Nessuno strumento MarketSentry Pro è ancora monitorato. Aggiungine uno da Impostazioni > Dispositivi e servizi > MarketSentry Pro > Aggiungi strumento.",
     empty_instrument: "Entità non trovata o non è uno strumento MarketSentry Pro: {entity}",
+    empty_instrument_no_entity: "Nessuno strumento è configurato per questa scheda.",
+    empty_instrument_add_instrument: "Aggiungine uno da Impostazioni > Dispositivi e servizi > MarketSentry Pro > Aggiungi strumento",
     group_predictions: "Mercati predittivi",
     group_stocks: "Azioni",
     group_crypto: "Criptovalute",
@@ -268,7 +289,10 @@ export const STRINGS = {
   },
   nl: {
     empty_card: "Geen gevolgde instrumenten komen overeen met de filters van deze kaart.",
+    empty_card_no_instruments: "Er worden nog geen MarketSentry Pro-instrumenten gevolgd. Voeg er een toe via Instellingen > Apparaten en services > MarketSentry Pro > Instrument toevoegen.",
     empty_instrument: "Entiteit niet gevonden of geen MarketSentry Pro-instrument: {entity}",
+    empty_instrument_no_entity: "Er is nog geen instrument geconfigureerd voor deze kaart.",
+    empty_instrument_add_instrument: "Voeg er een toe via Instellingen > Apparaten en services > MarketSentry Pro > Instrument toevoegen",
     group_predictions: "Voorspellingsmarkten",
     group_stocks: "Aandelen",
     group_crypto: "Cryptocurrencies",
